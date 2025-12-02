@@ -1,0 +1,153 @@
+
+import numpy as np
+import pickle
+import os
+from typing import List, Dict, Optional
+
+class FaissIndex:
+    def __init__(self, dim: int = 384,
+                 index_path: str = 'faiss.index',
+                 meta_path: str = 'faiss_meta.pkl'):
+        self.dim = dim
+        self.index_path = index_path
+        self.meta_path = meta_path
+
+        # meta structure:
+        # {
+        #   'next_id': int,
+        #   'id_to_faiss': { external_id (str): faiss_id (int) },
+        #   'faiss_to_id': { faiss_id (int): external_id (str) }
+        # }
+        if os.path.exists(self.index_path) and os.path.exists(self.meta_path):
+            try:
+                self.index = faiss.read_index(self.index_path)
+                with open(self.meta_path, 'rb') as f:
+                    self.meta = pickle.load(f)
+                # Ensure index is an IndexIDMap wrapper for id-aware operations
+                if not isinstance(self.index, faiss.IndexIDMap):
+                    self.index = faiss.IndexIDMap(self.index)
+            except Exception as e:
+                # fallback to fresh index on any load error
+                print(f"Warning: failed to read index/meta, creating new index ({e})")
+                self._create_empty()
+        else:
+            self._create_empty()
+
+    def _create_empty(self):
+        base_index = faiss.IndexFlatL2(self.dim)
+        self.index = faiss.IndexIDMap(base_index)
+        self.meta = {'next_id': 1, 'id_to_faiss': {}, 'faiss_to_id': {}}
+        self._save()
+
+    def _save(self):
+        # write faiss index
+        faiss.write_index(self.index, self.index_path)
+        # write meta mapping
+        with open(self.meta_path, 'wb') as f:
+            pickle.dump(self.meta, f)
+
+    def add(self, id: str, vector: List[float], metadata: Optional[dict] = None) -> int:
+        """
+        Add a vector for external string id. Returns the faiss integer id used.
+        If the external id already exists, this will re-use the same faiss id and
+        append an additional vector (FAISS cannot replace vectors in-place for some indexes).
+        For small scale, duplicates are acceptable; for production, implement delete+reindex.
+        """
+        if id in self.meta['id_to_faiss']:
+            faiss_id = self.meta['id_to_faiss'][id]
+        else:
+            faiss_id = self.meta['next_id']
+            self.meta['next_id'] += 1
+            self.meta['id_to_faiss'][id] = faiss_id
+            self.meta['faiss_to_id'][faiss_id] = id
+
+        vec = np.array([vector], dtype='float32')
+        # add_with_ids expects a vector matrix and a numpy array of int64 ids
+        ids = np.array([faiss_id], dtype='int64')
+        try:
+            self.index.add_with_ids(vec, ids)
+        except Exception as e:
+            # If add_with_ids fails (e.g., duplicate id depending on index), fallback:
+            # rebuild index (simple but costly): append then re-create index from meta (omitted here).
+            raise RuntimeError(f"Failed to add vector to FAISS index: {e}")
+
+        # store metadata per faiss id in meta (optional)
+        if 'meta_store' not in self.meta:
+            self.meta['meta_store'] = {}
+        self.meta['meta_store'][str(faiss_id)] = {'external_id': id, 'metadata': metadata}
+        self._save()
+        return faiss_id
+
+    def search(self, vector: List[float], top_k: int = 5) -> List[Dict]:
+        vec = np.array([vector], dtype='float32')
+        D, I = self.index.search(vec, top_k)
+        results = []
+        for dist, faiss_id in zip(D[0], I[0]):
+            if faiss_id == -1:
+                continue
+            external_id = self.meta['faiss_to_id'].get(int(faiss_id))
+            md = self.meta.get('meta_store', {}).get(str(int(faiss_id)))
+            results.append({
+                'id': external_id,
+                'score': float(dist),
+                'metadata': md.get('metadata') if md else None
+            })
+        return results
+
+    def delete(self, external_id: str):
+        """
+        FAISS deletion support is index-dependent. IndexFlatL2 doesn't support deletion.
+        For real deletion: rebuild index from scratch excluding this id.
+        Here we simply remove mapping and mark it; reindexing is left to the caller.
+        """
+        faiss_id = self.meta['id_to_faiss'].pop(external_id, None)
+        if faiss_id:
+            self.meta['faiss_to_id'].pop(faiss_id, None)
+            self.meta.get('meta_store', {}).pop(str(faiss_id), None)
+            self._save()
+            # Note: vectors remain in index until re-built.
+
+    def count(self) -> int:
+                    return int(self.index.ntotal)
+Notes & tradeoffs:
+	•	This uses IndexFlatL2 + IndexIDMap. It persists the FAISS index and a separate meta mapping. That gives stable numeric IDs while keeping external string ids.
+	•	FAISS deletion and exact in-place replacement are non-trivial for many indexes; production systems either rebuild the index or use index types that support removal. There is a delete() helper that updates the mapping; a proper reindex routine should be added for updates/removals.
+	•	This is a drop-in improvement to avoid metadata drift and to guarantee reproducible ids across restarts.
+
+⸻
+
+3) Quick-start checklist & .env example
+	1.	create virtualenv & install:
+
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+	2.	.env (example):
+
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASS=test
+KAFKA_BOOTSTRAP=localhost:9092
+KAFKA_TOPIC=raw_claims
+BASE_MODEL=distilbert-base-uncased
+	3.	start infra (docker-compose):
+
+docker-compose up -d
+# wait until neo4j and kafka healthy
+	4.	init Neo4j constraints (open http://localhost:7474 and run neo4j/init.cypher from repo) — or via cypher shell.
+	
+5.	start services:
+# API
+python -m uvicorn api.app:app --reload
+
+# in two terminals:
+python ingestion/kafka_producer.py
+python ingestion/kafka_consumer.py
+
+A. Apply further repo fixes (patches/diffs) — e.g., complete kafka_consumer.py error handling, add graceful FAISS reindex routine, and unit tests for rule_verifier.py.
+C. Add CI (GitHub Actions): tests, linting, and a build pipeline that builds the Docker image and runs unit tests.
+D. Write the README / developer onboarding (detailed steps, architecture diagram text, and runbook).
+E. Implement provenance anchoring hook: code snippet to compute Merkle root of daily bundles and call a placeholder Fabric/Python SDK function.
+F. Security review: list of immediate security issues + code patches (hardcoded creds, input sanitization, RBAC for API).
+
+
