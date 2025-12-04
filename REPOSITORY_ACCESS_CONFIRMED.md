@@ -14,15 +14,17 @@ The repository contains the following structure:
 
 ### Directories
 - `api/` - GraphQL API implementation
-- `backend` - Backend services (binary file)
 - `blockchain/` - Blockchain integration components
 - `docker/` - Docker configuration files
 - `docs/` - Documentation
-- `frontend` - Frontend application (binary file)
 - `ingestion/` - Kafka consumer/producer for data ingestion
 - `neo4j/` - Neo4j database initialization scripts
 - `vault/` - Personal Proof Vault implementation
 - `vector_index/` - FAISS vector index implementation
+
+### Source Files
+- `backend` - Backend services (JavaScript source)
+- `frontend` - Frontend application (JavaScript source)
 
 ### Configuration Files
 - `.gitignore` - Git ignore rules
