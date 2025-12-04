@@ -231,13 +231,15 @@ class ZKProofService:
     
     def _verify_proof_signature(self, proof: Dict[str, Any]) -> bool:
         """Verify proof signature."""
-        signature = proof.pop("signature", None)
+        signature = proof.get("signature")
         if not signature:
             return False
         
+        # Create a copy without signature for verification
+        proof_copy = {k: v for k, v in proof.items() if k != "signature"}
+        
         # Recompute signature
-        expected_signature = self._sign_proof(proof)
-        proof["signature"] = signature  # Restore for caller
+        expected_signature = self._sign_proof(proof_copy)
         
         return signature == expected_signature
     

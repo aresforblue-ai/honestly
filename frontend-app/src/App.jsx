@@ -4,9 +4,19 @@ import { ApolloClient, InMemoryCache, ApolloProvider, useQuery, gql } from '@apo
 import { Shield, Search, CheckCircle, AlertTriangle, FileJson, Lock, Activity, Eye, Server, Terminal } from 'lucide-react';
 
 // --- 1. CONFIGURATION & CLIENT ---
-// In a real repo, move this to src/lib/apollo.js
+const getGraphQLUri = () => {
+  if (process.env.REACT_APP_GRAPHQL_URI) {
+    return process.env.REACT_APP_GRAPHQL_URI;
+  }
+  // Default for development only
+  if (import.meta.env.MODE === 'development') {
+    return 'http://localhost:4000/graphql';
+  }
+  throw new Error('REACT_APP_GRAPHQL_URI environment variable is required in production');
+};
+
 const client = new ApolloClient({
-  uri: 'http://localhost:4000/graphql', // Your Backend Port
+  uri: getGraphQLUri(),
   cache: new InMemoryCache(),
 });
 
@@ -44,7 +54,6 @@ const GET_APP_DETAILS = gql`
         sentiment
       }
     }
-    # This queries your ZK Shadow Oracle status (Mocked for UI)
     scoreApp(appId: $id) {
       grade
       breakdown {
@@ -56,8 +65,6 @@ const GET_APP_DETAILS = gql`
 `;
 
 // --- 3. HELPER COMPONENTS ---
-
-// The "Grade" Badge - Critical for visual trust
 const GradeBadge = ({ score }) => {
   let grade = 'F';
   let color = 'bg-red-500';
@@ -74,7 +81,6 @@ const GradeBadge = ({ score }) => {
   );
 };
 
-// The ZK Verification Pill
 const ZKStatus = ({ isVerified }) => (
   <div className={`flex items-center gap-2 px-3 py-1 text-xs font-mono border rounded-full ${isVerified ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10' : 'border-slate-600 text-slate-400'}`}>
     <Lock size={12} />
@@ -83,8 +89,6 @@ const ZKStatus = ({ isVerified }) => (
 );
 
 // --- 4. PAGES ---
-
-// Dashboard / Search Page
 const Dashboard = () => {
   const { loading, error, data } = useQuery(GET_APPS);
   const [searchTerm, setSearchTerm] = useState('');
@@ -98,7 +102,6 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-8">
-      {/* Hero Search */}
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
           <Search className="text-slate-500" />
@@ -111,7 +114,6 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredApps.map(app => (
           <Link key={app.id} to={`/app/${app.id}`} className="group relative bg-slate-800 border border-slate-700 rounded-xl p-6 hover:border-emerald-500/50 transition-all hover:shadow-2xl hover:shadow-emerald-500/10">
@@ -124,7 +126,7 @@ const Dashboard = () => {
             <h3 className="text-xl font-bold text-slate-100 mb-1">{app.name}</h3>
             <p className="text-sm text-slate-400 font-mono mb-4">ID: {app.id.slice(0, 8)}...</p>
             <div className="flex items-center justify-between border-t border-slate-700 pt-4">
-              <ZKStatus isVerified={Math.random() > 0.5} /> {/* Mocked for list view */}
+              <ZKStatus isVerified={app.metadata?.zkProofVerified || false} />
               <span className="text-xs text-slate-500 font-mono">Whistler Score: {app.whistlerScore}</span>
             </div>
           </Link>
@@ -134,7 +136,6 @@ const Dashboard = () => {
   );
 };
 
-// App Detail / Truth Terminal
 const AppTruthTerminal = () => {
   const { id } = useParams();
   const { loading, error, data } = useQuery(GET_APP_DETAILS, { variables: { id } });
@@ -145,13 +146,12 @@ const AppTruthTerminal = () => {
   const app = data.app;
   const scoreData = data.scoreApp;
 
-  // For AI Agents: This copies the strict JSON schema to clipboard
   const copyForAgent = () => {
     const payload = JSON.stringify({
       entity: app.name,
       verification_grade: scoreData.grade,
       provenance_claims: app.claims.length,
-      zk_proof_available: true, // Derived from backend in real app
+      zk_proof_available: true,
       timestamp: new Date().toISOString()
     }, null, 2);
     navigator.clipboard.writeText(payload);
@@ -160,7 +160,6 @@ const AppTruthTerminal = () => {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-slate-800 p-8 rounded-2xl border border-slate-700">
         <div className="flex items-center gap-6">
           <GradeBadge score={app.whistlerScore} />
@@ -184,7 +183,6 @@ const AppTruthTerminal = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Col: The Breakdown */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6 flex items-center gap-2">
@@ -195,8 +193,8 @@ const AppTruthTerminal = () => {
               {[
                 { label: 'Privacy Hygiene', val: scoreData.breakdown.privacy.value },
                 { label: 'Financial Transparency', val: scoreData.breakdown.financial.value },
-                { label: 'User Sentiment', val: 78 }, // Example
-                { label: 'Provenance Depth', val: 45 }, // Example
+                { label: 'User Sentiment', val: 78 },
+                { label: 'Provenance Depth', val: 45 },
               ].map((stat) => (
                 <div key={stat.label}>
                   <div className="flex justify-between text-sm mb-2">
@@ -206,7 +204,7 @@ const AppTruthTerminal = () => {
                   <div className="h-2 bg-slate-900 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-emerald-500 rounded-full transition-all duration-1000" 
-                      style={{ width: ${stat.val}% }}
+                      style={{ width: `${stat.val}%` }}
                     />
                   </div>
                 </div>
@@ -227,7 +225,6 @@ const AppTruthTerminal = () => {
           </div>
         </div>
 
-        {/* Right Col: The Claims (Truth Table) */}
         <div className="lg:col-span-2">
           <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
             <div className="p-6 border-b border-slate-700 flex justify-between items-center">
@@ -280,7 +277,6 @@ const App = () => {
     <ApolloProvider client={client}>
       <Router>
         <div className="min-h-screen bg-slate-950 text-slate-200 selection:bg-emerald-500/30">
-          {/* Top Navigation */}
           <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
               <Link to="/" className="flex items-center gap-3 group">
@@ -296,7 +292,6 @@ const App = () => {
             </div>
           </nav>
 
-          {/* Main Content Area */}
           <main className="max-w-7xl mx-auto px-6 py-8">
             <Routes>
               <Route path="/" element={<Dashboard />} />

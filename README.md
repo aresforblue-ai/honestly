@@ -1,167 +1,191 @@
-# Truth Engine – Personal Proof Vault MVP
+# Honestly - Truth Engine & Personal Proof Vault
 
-A blockchain-verified identity and credential verification system with zero-knowledge proofs and Hyperledger Fabric attestations.
+A comprehensive blockchain-verified identity and credential verification system with zero-knowledge proofs and distributed trust infrastructure.
 
-This bundle contains drop-in replacements for a few files in the starter repository:
-- `vector_index/faiss_index.py` – ID-stable FAISS wrapper using `IndexIDMap`
-- `ingestion/kafka_consumer.py` – fixed init/loop, error handling, and safe upserts
-- `api/schema.graphql` – adds optional `provenance` field
-- `api/app.py` – robust schema path + provenance passthrough
-- `docker-compose.yml` – exposes Kafka on host and container networks
+## 🏗️ Architecture
 
-## Quick start (local dev)
-1. Ensure Python 3.10+ and Docker are installed.
-2. Copy these files over your repo (or unzip `truth-engine-fixes.zip` at repo root).
-3. Create `.env` from the example:
-   ```
-   NEO4J_URI=bolt://localhost:7687
-   NEO4J_USER=neo4j
-   NEO4J_PASS=test
-   KAFKA_BOOTSTRAP=localhost:9092
-   KAFKA_TOPIC=raw_claims
-   ```
-4. Start services:
-   ```bash
-   docker-compose up -d
-   ```
-5. Initialize Neo4j constraints (browser http://localhost:7474) with your `neo4j/init.cypher`.
-6. Start API and ingestion:
-   ```bash
-   python -m uvicorn api.app:app --reload
-   python ingestion/kafka_producer.py
-   python ingestion/kafka_consumer.py
-   ```
-7. Open GraphQL Playground: http://localhost:8000/graphql
+The Honestly platform consists of three main components:
 
-## Notes
-- FAISS now maintains stable numeric IDs across restarts and keeps metadata in sync.
-- Kafka is reachable at `localhost:9092` from your host **and** `kafka:9092` from containers.
-- Neo4j relationship and node upserts are idempotent via `merge()`.
+### 1. **Frontend Application** (`frontend-app/`)
+- React + Vite application
+- TailwindCSS for styling
+- Apollo Client for GraphQL
+- AppWhistler UI for app verification
 
----
+### 2. **GraphQL Backend** (`backend-graphql/`)
+- Node.js + Apollo Server
+- App verification and scoring engine
+- Claims, evidence, and verdict management
+- WhistlerScore calculation
 
-## Full End-to-End (fresh clone)
-1. Create and activate a virtualenv (optional but recommended).
-2. Install deps:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Start infra:
-   ```bash
-   docker-compose up -d
-   ```
-4. (Optional) Load Neo4j constraints:
-   - Open http://localhost:7474 → run `neo4j/init.cypher`
-5. Run API locally:
-   ```bash
-   uvicorn api.app:app --reload
-   ```
-6. Produce a few demo messages:
-   ```bash
-   python ingestion/kafka_producer.py
-   ```
-7. Start consumer (ingests -> Neo4j + FAISS):
-   ```bash
-   python ingestion/kafka_consumer.py
-   ```
-8. Try a GraphQL query at http://localhost:8000/graphql:
-   ```graphql
-   query {
-     search(query: "Eiffel Tower", topK: 3) {
-       id
-       text
-       source
-       veracity
-       state
-     }
-   }
-   ```
+### 3. **Python Backend** (`backend-python/`)
+- FastAPI REST API
+- Neo4j graph database
+- Kafka event streaming
+- FAISS vector search
+- Hyperledger Fabric blockchain
+- Zero-knowledge proof generation
 
-### Notes
-- FAISS index files (`faiss.index`, `faiss_meta.pkl`) are written to the project root.
-- Kafka advertised listeners are set so host tools use `localhost:9092` while containers use `kafka:9092`.
-- If `faiss-cpu` install fails on Apple Silicon or Windows, install via `conda` or use WSL for simplicity.
+## 🚀 Quick Start
 
----
+### Prerequisites
+- Node.js 18+
+- Python 3.10+
+- Docker & Docker Compose
+- PostgreSQL (for GraphQL backend)
+- Neo4j (for Python backend)
 
-## Personal Proof Vault MVP
+### 1. Start Infrastructure
 
-The Personal Proof Vault MVP enables users to:
-- **Upload and encrypt** sensitive documents (ID, licenses, financial records)
-- **Generate zero-knowledge proofs** for selective disclosure (age, authenticity)
-- **Anchor attestations** on Hyperledger Fabric blockchain
-- **Create shareable proof links** with QR codes
-- **Track verification timeline** of all operations
-
-### Quick Start (Vault)
-
-1. **Start services:**
-   ```bash
-   docker-compose up -d
-   ```
-
-2. **Initialize Neo4j vault schema:**
-   ```bash
-   cat neo4j/vault_init.cypher | cypher-shell -u neo4j -p test
-   ```
-
-3. **Start API:**
-   ```bash
-   uvicorn api.app:app --reload
-   ```
-
-4. **Upload a document:**
-   ```bash
-   curl -X POST http://localhost:8000/vault/upload \
-     -F "file=@document.pdf" \
-     -F "document_type=IDENTITY"
-   ```
-
-5. **Query via GraphQL:**
-   ```graphql
-   query {
-     myDocuments {
-       id
-       documentType
-       hash
-       createdAt
-     }
-   }
-   ```
-
-### Documentation
-
-- **API Documentation:** See `docs/vault-api.md`
-- **Quick Start Guide:** See `docs/vault-quickstart.md`
-- **GraphQL Playground:** http://localhost:8000/graphql
-- **REST API Docs:** http://localhost:8000/docs
-
-### Features
-
-- **Encrypted Storage:** AES-256-GCM encryption with user-specific keys
-- **Zero-Knowledge Proofs:** Age and document authenticity proofs
-- **Blockchain Attestations:** Hyperledger Fabric integration for tamper-proof records
-- **Share Links:** Cryptographically secure, expirable proof sharing
-- **Timeline Tracking:** Complete audit trail of all operations
-- **QR Codes:** Easy sharing via QR code generation
-
-### Architecture
-
-```
-Client → FastAPI → Vault Storage (Encrypted)
-                ↓
-            Neo4j (Graph DB)
-                ↓
-            Kafka (Events)
-                ↓
-        Hyperledger Fabric (Blockchain)
+```bash
+docker-compose up -d
 ```
 
-### Security Notes
+This starts:
+- Neo4j (ports 7474, 7687)
+- Kafka + Zookeeper (port 9092)
+- PostgreSQL (port 5432)
 
-**MVP Warning:** This is a development MVP. For production use:
+### 2. Start Python Backend
+
+```bash
+cd backend-python
+pip install -r requirements.txt
+uvicorn api.app:app --reload
+```
+
+Access at: http://localhost:8000
+
+### 3. Start GraphQL Backend
+
+```bash
+cd backend-graphql
+npm install
+npm run dev
+```
+
+Access at: http://localhost:4000/graphql
+
+### 4. Start Frontend
+
+```bash
+cd frontend-app
+npm install
+npm run dev
+```
+
+Access at: http://localhost:3000
+
+## 📚 Documentation
+
+- [Vault API Documentation](docs/vault-api.md)
+- [Vault Quick Start Guide](docs/vault-quickstart.md)
+- [Personal Proof Vault Overview](docs/personal-proof-vault.md)
+- [Project Scope](docs/Scope.md)
+
+## 🔑 Features
+
+### AppWhistler (GraphQL Backend)
+- ✅ App verification and trust scoring
+- ✅ Claims and evidence management
+- ✅ Verdict tracking and provenance
+- ✅ Multi-signal scoring engine
+- ✅ Privacy, financial, and sentiment analysis
+
+### Personal Proof Vault (Python Backend)
+- ✅ Encrypted document storage (AES-256-GCM)
+- ✅ Zero-knowledge proofs for selective disclosure
+- ✅ Hyperledger Fabric attestations
+- ✅ QR code generation for sharing
+- ✅ Complete audit timeline
+- ✅ Graph-based claim verification
+
+## 🛠️ Development
+
+### Testing
+
+Frontend:
+```bash
+cd frontend-app
+npm test
+```
+
+GraphQL Backend:
+```bash
+cd backend-graphql
+npm test
+```
+
+Python Backend:
+```bash
+cd backend-python
+pytest
+```
+
+### Linting
+
+```bash
+# Frontend
+cd frontend-app && npm run lint
+
+# GraphQL Backend
+cd backend-graphql && npm run lint
+```
+
+## 📦 Project Structure
+
+```
+honestly/
+├── frontend-app/           # React frontend application
+│   ├── src/
+│   │   ├── App.jsx        # Main application component
+│   │   ├── main.jsx       # Application entry point
+│   │   └── index.css      # Global styles
+│   ├── package.json
+│   └── vite.config.js
+│
+├── backend-graphql/        # Node.js GraphQL backend
+│   ├── src/
+│   │   ├── config/        # Configuration files
+│   │   ├── graphql/       # Schema and resolvers
+│   │   ├── loaders/       # Express and Apollo setup
+│   │   └── utils/         # Utility functions
+│   └── package.json
+│
+├── backend-python/         # Python FastAPI backend
+│   ├── api/               # FastAPI routes
+│   ├── vault/             # Vault implementation
+│   ├── ingestion/         # Kafka integration
+│   ├── blockchain/        # Fabric integration
+│   └── vector_index/      # FAISS search
+│
+├── docs/                   # Documentation
+├── neo4j/                  # Neo4j initialization
+└── docker-compose.yml      # Infrastructure setup
+```
+
+## 🔐 Security Notes
+
+**⚠️ MVP Warning:** This is a development MVP. For production:
 - Implement proper JWT authentication
 - Use production Fabric network
-- Integrate real ZK-SNARK circuits (not simplified proofs)
+- Integrate real ZK-SNARK circuits
 - Add rate limiting and security auditing
 - Implement proper key management
+- Enable HTTPS/TLS
+- Add input sanitization
+
+## 📄 License
+
+See [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+## 📧 Support
+
+For issues and questions, please use the GitHub issue tracker.
