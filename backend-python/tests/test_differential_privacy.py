@@ -426,6 +426,6 @@ class TestDifferentialPrivacyEdgeCases:
         assert len(set(laplace_values)) > 1
         assert len(set(gaussian_values)) > 1
         
-        # Distributions should be different (this is probabilistic)
-        # We just check both work without crashing
-        assert statistics.mean(laplace_values) != statistics.mean(gaussian_values) or True
+        # Both mechanisms work correctly - no need for further assertion
+        # The distributions are different by design, but testing this 
+        # statistically would require many more samples and proper hypothesis testing

@@ -101,8 +101,14 @@ class DifferentialPrivacy:
         scale = sensitivity / epsilon
         
         # Generate Laplace noise using two exponential distributions
-        u1 = secrets.SystemRandom().random()
-        u2 = secrets.SystemRandom().random()
+        # Ensure u1 and u2 are non-zero to avoid log(0) or division by zero
+        rng = secrets.SystemRandom()
+        u1 = rng.random()
+        while u1 == 0.0:
+            u1 = rng.random()
+        u2 = rng.random()
+        while u2 == 0.0:
+            u2 = rng.random()
         noise = scale * math.log(u1 / u2)
         
         noisy_value = true_value + noise

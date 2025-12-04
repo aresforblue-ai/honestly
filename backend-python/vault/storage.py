@@ -47,7 +47,7 @@ class VaultStorage:
             else:
                 # Generate a new key (in production, this should be stored securely)
                 self.master_key = AESGCM.generate_key(bit_length=256)
-                logger.warning(f"Generated new encryption key. Store this securely: {base64.b64encode(self.master_key).decode()}")
+                logger.warning("Generated new encryption key. Set VAULT_ENCRYPTION_KEY environment variable to persist it.")
         
         if len(self.master_key) != 32:
             raise ValueError("Encryption key must be 32 bytes (256 bits)")
@@ -60,6 +60,10 @@ class VaultStorage:
     
     def _derive_user_key(self, user_id: str) -> bytes:
         """Derive a user-specific encryption key from master key."""
+        return self._derive_user_key_from_master(user_id, self.master_key)
+    
+    def _derive_user_key_from_master(self, user_id: str, master_key: bytes) -> bytes:
+        """Derive a user-specific encryption key from a specific master key."""
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
@@ -67,7 +71,7 @@ class VaultStorage:
             iterations=100000,
             backend=default_backend()
         )
-        return kdf.derive(self.master_key)
+        return kdf.derive(master_key)
     
     def _compute_hash(self, data: bytes) -> str:
         """Compute SHA-256 hash of data."""
@@ -279,14 +283,19 @@ class VaultStorage:
                 
                 user_id = metadata['user_id']
                 
-                # Decrypt with old key
-                old_master_key = self.master_key
-                self.master_key = old_key
-                decrypted_data = self.download_document(user_id, doc_id)
+                # Decrypt with old key (derive old user key directly)
+                old_user_key = self._derive_user_key_from_master(user_id, old_key)
+                file_path = os.path.join(self.storage_path, f"{doc_id}.enc")
+                with open(file_path, 'rb') as f:
+                    encrypted_with_nonce = f.read()
+                
+                nonce_old = encrypted_with_nonce[:12]
+                encrypted_data_old = encrypted_with_nonce[12:]
+                aesgcm_old = AESGCM(old_user_key)
+                decrypted_data = aesgcm_old.decrypt(nonce_old, encrypted_data_old, None)
                 
                 # Re-encrypt with new key
-                self.master_key = new_key
-                user_key = self._derive_user_key(user_id)
+                user_key = self._derive_user_key(user_id)  # Uses current master_key (new_key)
                 aesgcm = AESGCM(user_key)
                 nonce = os.urandom(12)
                 encrypted_data = aesgcm.encrypt(nonce, decrypted_data, None)
