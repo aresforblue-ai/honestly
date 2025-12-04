@@ -4,8 +4,19 @@ import { ApolloClient, InMemoryCache, ApolloProvider, useQuery, gql } from '@apo
 import { Shield, Search, CheckCircle, AlertTriangle, FileJson, Lock, Activity, Eye, Server, Terminal } from 'lucide-react';
 
 // --- 1. CONFIGURATION & CLIENT ---
+const getGraphQLUri = () => {
+  if (process.env.REACT_APP_GRAPHQL_URI) {
+    return process.env.REACT_APP_GRAPHQL_URI;
+  }
+  // Default for development only
+  if (import.meta.env.MODE === 'development') {
+    return 'http://localhost:4000/graphql';
+  }
+  throw new Error('REACT_APP_GRAPHQL_URI environment variable is required in production');
+};
+
 const client = new ApolloClient({
-  uri: process.env.REACT_APP_GRAPHQL_URI || 'http://localhost:4000/graphql',
+  uri: getGraphQLUri(),
   cache: new InMemoryCache(),
 });
 
@@ -115,7 +126,7 @@ const Dashboard = () => {
             <h3 className="text-xl font-bold text-slate-100 mb-1">{app.name}</h3>
             <p className="text-sm text-slate-400 font-mono mb-4">ID: {app.id.slice(0, 8)}...</p>
             <div className="flex items-center justify-between border-t border-slate-700 pt-4">
-              <ZKStatus isVerified={Math.random() > 0.5} />
+              <ZKStatus isVerified={app.metadata?.zkProofVerified || false} />
               <span className="text-xs text-slate-500 font-mono">Whistler Score: {app.whistlerScore}</span>
             </div>
           </Link>
