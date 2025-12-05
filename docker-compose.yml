@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # Neo4j Graph Database
+  neo4j:
+    image: neo4j:5.13
+    container_name: honestly-neo4j
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    environment:
+      - NEO4J_AUTH=neo4j/test
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_security_procedures_allowlist=apoc.*
+    volumes:
+      - neo4j_data:/data
+      - ./neo4j:/import
+    networks:
+      - honestly-network
+
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: honestly-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - honestly-network
+
+  # Kafka Message Broker
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: honestly-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - honestly-network
+
+  # PostgreSQL for GraphQL Backend
+  postgres:
+    image: postgres:16-alpine
+    container_name: honestly-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: honestly
+      POSTGRES_PASSWORD: honestly123
+      POSTGRES_DB: honestly
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - honestly-network
+
+volumes:
+  neo4j_data:
+  postgres_data:
+
+networks:
+  honestly-network:
+    driver: bridge

@@ -1,0 +1,119 @@
+type Claim {
+  id: ID!
+  text: String
+  veracity: Float
+  state: String
+  timestamp: String
+  source: String
+  provenance: String
+}
+
+# Vault Types
+enum DocumentType {
+  IDENTITY
+  LICENSE
+  FINANCIAL
+  CREDENTIAL
+  OTHER
+}
+
+enum AccessLevel {
+  PROOF_ONLY
+  METADATA
+  FULL
+}
+
+type Document {
+  id: ID!
+  userId: String!
+  documentType: DocumentType!
+  hash: String!
+  fileName: String
+  mimeType: String
+  sizeBytes: Int
+  metadata: String  # JSON string
+  createdAt: String!
+  updatedAt: String
+}
+
+type Attestation {
+  id: ID!
+  documentId: ID!
+  fabricTxId: String!
+  merkleRoot: String!
+  timestamp: String!
+  signature: String!
+  publicKey: String!
+  verified: Boolean!
+  verifiedAt: String
+}
+
+type ProofLink {
+  shareToken: String!
+  documentId: ID!
+  expiresAt: String
+  accessLevel: AccessLevel!
+  proofType: String
+  createdAt: String!
+  accessCount: Int!
+  maxAccesses: Int
+}
+
+type TimelineEvent {
+  userId: String!
+  eventType: String!
+  documentId: ID
+  timestamp: String!
+  metadata: String  # JSON string
+  attestationId: ID
+  proofLinkId: ID
+}
+
+type ZKProof {
+  proofType: String!
+  proofData: String!  # JSON string of proof
+  publicInputs: String!  # JSON string
+  verified: Boolean
+}
+
+type Query {
+  claim(id: ID!): Claim
+  search(query: String!, topK: Int = 5): [Claim]
+  
+  # Vault Queries
+  myDocuments: [Document!]!
+  document(id: ID!): Document
+  myTimeline(limit: Int = 50): [TimelineEvent!]!
+  verifyShareLink(token: String!): ProofLink
+  attestation(documentId: ID!): Attestation
+}
+
+type Mutation {
+  # Vault Mutations
+  uploadDocument(
+    documentType: DocumentType!
+    fileName: String
+    mimeType: String
+    metadata: String
+  ): Document!
+  
+  generateProof(
+    documentId: ID!
+    proofType: String!  # "age_proof" or "authenticity_proof"
+    proofParams: String  # JSON string with proof-specific parameters
+  ): ZKProof!
+  
+  createShareLink(
+    documentId: ID!
+    expiresAt: String
+    accessLevel: AccessLevel!
+    proofType: String
+    maxAccesses: Int
+  ): ProofLink!
+  
+  verifyProof(
+    proofData: String!
+    publicInputs: String!
+    proofType: String!
+  ): Boolean!
+}

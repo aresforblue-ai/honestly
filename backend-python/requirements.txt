@@ -1,0 +1,15 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.0
+ariadne==0.23.0
+py2neo==2021.2.4
+sentence-transformers==3.1.1
+faiss-cpu==1.8.0.post1
+kafka-python==2.0.2
+python-dotenv==1.0.1
+numpy==1.26.4
+# Vault dependencies
+cryptography>=41.0.0
+qrcode[pil]>=7.4.2
+pyjwt>=2.8.0
+# Note: For production ZK proofs, consider zkpy or circom integration
+# Note: For production Fabric SDK, use fabric-sdk-py or hfc
