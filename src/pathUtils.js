@@ -174,12 +174,7 @@ class PathUtils {
     if (!inputPath || typeof inputPath !== 'string') {
       return false;
     }
-    try {
-      fs.accessSync(inputPath);
-      return true;
-    } catch {
-      return false;
-    }
+    return fs.existsSync(inputPath);
   }
 
   /**
