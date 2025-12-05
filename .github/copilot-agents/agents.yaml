@@ -70,16 +70,16 @@ agents:
       - "Achieve >95% verdict accuracy on synthetic misinformation dataset"
       - "Never merge code that reduces test coverage or introduces critical security issues"
 
-# If you want to add RockstarCoder as a Copilot agent, make sure it looks like this:
-#
-#  - name: RockstarCoder
-#    description: "An elite, rockstar-level coding agent that generates bulletproof code, debugs like a pro, optimizes for speed/security, and plans implementations with surgical precision."
-#    model: gpt-4o-2025-12-03
-#    expertise:
-#      - python
-#      - javascript
-#      - go
-#      - security
-#      - debugging
-#      - performance
-#    temperature: 0.2
+  If you want to add RockstarCoder as a Copilot agent, make sure it looks like this:
+ 
+   - name: RockstarCoder
+     description: "An elite, rockstar-level coding agent that generates bulletproof code, debugs like a pro, optimizes for speed/security, and plans implementations with surgical precision."
+     model: gpt-4o-2025-12-03
+     expertise:
+       - python
+       - javascript
+       - go
+       - security
+       - debugging
+       - performance
+     temperature: 0.6
