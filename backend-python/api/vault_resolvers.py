@@ -231,10 +231,17 @@ def resolve_generate_proof(
     
     elif proofType == "authenticity_proof":
         merkle_root = params.get('merkle_root', doc_meta['hash'])
-        
+        merkle_proof = params.get('merkle_proof')
+        merkle_positions = params.get('merkle_positions')
+
+        if merkle_proof is None or merkle_positions is None:
+            raise ValueError("merkle_proof and merkle_positions are required for authenticity_proof")
+
         proof_result = zk_service.generate_authenticity_proof(
             document_hash=doc_meta['hash'],
-            merkle_root=merkle_root
+            merkle_root=merkle_root,
+            merkle_proof=merkle_proof,
+            merkle_positions=merkle_positions
         )
     
     else:

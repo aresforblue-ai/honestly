@@ -1,276 +1,236 @@
 """
-Zero-knowledge proof generation and verification for vault documents.
-Uses Python-based ZK libraries for age and document authenticity proofs.
+Zero-knowledge proof generation and verification using circom/snarkjs.
+Relies on the local Node-based runner at backend-python/zkp/snark-runner.js.
 """
-import json
-import hashlib
-from typing import Dict, Any, Optional
-from datetime import datetime
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.backends import default_backend
 
-# For MVP, we'll use a simplified ZK approach with cryptographic commitments
-# In production, this would use proper ZK-SNARK libraries like zkpy or circom
+import json
+import secrets
+import subprocess
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 
 class ZKProofService:
-    """Service for generating and verifying zero-knowledge proofs."""
-    
-    def __init__(self):
-        """Initialize ZK proof service."""
-        pass
-    
+    """Service for generating and verifying zkSNARK proofs via snarkjs runner."""
+
+    def __init__(self, runner_path: Optional[str] = None):
+        base_dir = Path(__file__).resolve().parent.parent / "zkp"
+        self.runner_path = Path(runner_path) if runner_path else base_dir / "snark-runner.js"
+
+    def _run(self, action: str, circuit: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Invoke the Node snark-runner with JSON payload via stdin."""
+        if not self.runner_path.exists():
+            raise RuntimeError(
+                f"snark runner not found at {self.runner_path}. Build zk artifacts under backend-python/zkp."
+            )
+
+        cmd = ["node", str(self.runner_path), action, circuit]
+        proc = subprocess.run(
+            cmd,
+            input=json.dumps(payload),
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(f"zk runner failed: {proc.stderr.strip() or proc.stdout.strip()}")
+
+        try:
+            return json.loads(proc.stdout)
+        except Exception as exc:
+            raise RuntimeError(f"invalid runner output: {proc.stdout}") from exc
+
+    def _strip_hex_prefix(self, value: str) -> str:
+        return value[2:] if value.startswith("0x") else value
+
     def generate_age_proof(
         self,
         birth_date: str,  # ISO format: YYYY-MM-DD
         min_age: int,
-        document_hash: str
+        document_hash: str,
+        reference_ts: Optional[int] = None,
+        epoch: int = 0,
     ) -> Dict[str, Any]:
-        """
-        Generate a zero-knowledge proof that age >= min_age without revealing birthdate.
-        
-        This is a simplified implementation. In production, use proper ZK-SNARK circuits.
-        
-        Args:
-            birth_date: Birth date in ISO format
-            min_age: Minimum age to prove
-            document_hash: Hash of the document containing birthdate
-            
-        Returns:
-            Dictionary containing proof data and public inputs
-        """
-        # Parse birth date
+        """Generate zkSNARK age proof using Groth16 with nullifier."""
         birth_dt = datetime.fromisoformat(birth_date)
-        current_dt = datetime.utcnow()
-        age_years = (current_dt - birth_dt).days // 365
-        
-        if age_years < min_age:
-            raise ValueError(f"Age {age_years} is less than required minimum {min_age}")
-        
-        # Create commitment to birth date (simplified - in production use proper commitment scheme)
-        commitment_secret = f"{birth_date}_{document_hash}"
-        commitment = hashlib.sha256(commitment_secret.encode()).hexdigest()
-        
-        # Create proof that age >= min_age
-        # In a real ZK system, this would be a SNARK proof
-        # For MVP, we create a cryptographic signature-like structure
-        proof_data = {
-            "proof_type": "age_proof",
-            "commitment": commitment,
-            "min_age": min_age,
-            "age_verified": True,
-            "document_hash": document_hash,
-            "timestamp": current_dt.isoformat()
+        birth_ts = int(birth_dt.timestamp())
+        ref_ts = reference_ts or int(datetime.utcnow().timestamp())
+
+        if ref_ts <= birth_ts:
+            raise ValueError("reference timestamp must be after birth date")
+
+        payload = {
+            "birthTs": str(birth_ts),
+            "referenceTs": str(ref_ts),
+            "minAge": str(min_age),
+            "documentHashHex": self._strip_hex_prefix(document_hash),
+            "salt": str(secrets.randbits(128)),
+            "epoch": str(epoch),  # Private epoch for age circuit
         }
+
+        bundle = self._run("prove", "age", payload)
+        public_inputs = bundle.get("namedSignals", {})
         
-        # Sign the proof (simplified - in production use proper ZK signature)
-        proof_signature = self._sign_proof(proof_data)
-        proof_data["signature"] = proof_signature
-        
-        public_inputs = {
-            "min_age": min_age,
-            "commitment": commitment,
-            "age_verified": True,
-            "document_hash": document_hash
-        }
-        
+        # Extract nullifier from public signals (last signal)
+        nullifier = bundle.get("publicSignals", [])[-1] if bundle.get("publicSignals") else None
+
         return {
-            "proof_data": json.dumps(proof_data),
+            "proof_data": json.dumps(bundle),
             "public_inputs": json.dumps(public_inputs),
-            "proof_type": "age_proof"
+            "proof_type": "age_proof",
+            "nullifier": nullifier,  # For nullifier tracking
         }
-    
+
     def verify_age_proof(
         self,
         proof_data: str,
-        public_inputs: str
+        public_inputs: str = "",
+        check_nullifier: bool = True,
     ) -> bool:
         """
-        Verify an age proof.
+        Verify zkSNARK age proof with nullifier check.
         
         Args:
-            proof_data: JSON string of proof data
-            public_inputs: JSON string of public inputs
-            
+            proof_data: JSON string containing proof bundle
+            public_inputs: JSON string containing public inputs (unused, kept for compatibility)
+            check_nullifier: If True, check nullifier hasn't been used (one-time use)
+        
         Returns:
-            True if proof is valid, False otherwise
+            True if proof is valid and nullifier not used, False otherwise
         """
         try:
-            proof = json.loads(proof_data)
-            inputs = json.loads(public_inputs)
-            
-            # Verify proof type
-            if proof.get("proof_type") != "age_proof":
-                return False
-            
-            # Verify commitment matches
-            if proof.get("commitment") != inputs.get("commitment"):
-                return False
-            
-            # Verify minimum age matches
-            if proof.get("min_age") != inputs.get("min_age"):
-                return False
-            
-            # Verify age was actually verified
-            if not proof.get("age_verified") or not inputs.get("age_verified"):
-                return False
-            
-            # Verify signature (simplified)
-            if not self._verify_proof_signature(proof):
-                return False
-            
-            return True
-        except Exception as e:
-            print(f"Error verifying age proof: {e}")
+            bundle = json.loads(proof_data)
+        except Exception:
             return False
-    
+
+        # Extract nullifier from public signals (last signal)
+        public_signals = bundle.get("publicSignals", [])
+        if not public_signals:
+            return False
+        
+        nullifier = public_signals[-1]
+        
+        # Check nullifier hasn't been used (one-time use prevention)
+        if check_nullifier:
+            from vault.nullifier_storage import verify_nullifier_not_used, mark_nullifier_used
+            
+            if not verify_nullifier_not_used(nullifier):
+                return False  # Nullifier already used
+        
+        # Verify proof
+        try:
+            result = self._run("verify", "age", bundle)
+            verified = bool(result.get("verified"))
+            
+            # Mark nullifier as used AFTER successful verification
+            if verified and check_nullifier:
+                from vault.nullifier_storage import mark_nullifier_used
+                mark_nullifier_used(nullifier)
+            
+            return verified
+        except Exception:
+            return False
+
     def generate_authenticity_proof(
         self,
         document_hash: str,
         merkle_root: str,
-        merkle_proof: Optional[list] = None
+        merkle_proof: Optional[list] = None,
+        merkle_positions: Optional[list] = None,
+        epoch: int = 0,
     ) -> Dict[str, Any]:
         """
-        Generate a zero-knowledge proof that a document hash is authentic
-        (exists in a Merkle tree) without revealing the document content.
-        
-        Args:
-            document_hash: SHA-256 hash of the document
-            merkle_root: Root hash of the Merkle tree
-            merkle_proof: Optional Merkle proof path (for full verification)
-            
-        Returns:
-            Dictionary containing proof data and public inputs
+        Generate a zkSNARK Merkle inclusion proof with nullifier.
+        merkle_proof: list of sibling hex hashes (same length as positions)
+        merkle_positions: list of 0/1 integers (0 = sibling on left, 1 = sibling on right)
+        epoch: public epoch number (for freshness enforcement and nullifier purging)
         """
-        # Create proof structure
-        proof_data = {
-            "proof_type": "authenticity_proof",
-            "document_hash": document_hash,
-            "merkle_root": merkle_root,
-            "timestamp": datetime.utcnow().isoformat()
+        if merkle_proof is None or merkle_positions is None:
+            raise ValueError("merkle_proof and merkle_positions are required for authenticity proofs")
+
+        if len(merkle_proof) != len(merkle_positions):
+            raise ValueError("merkle_proof and merkle_positions must have the same length")
+
+        payload = {
+            "leafHex": self._strip_hex_prefix(document_hash),
+            "rootHex": self._strip_hex_prefix(merkle_root),
+            "pathElementsHex": [self._strip_hex_prefix(p) for p in merkle_proof],
+            "pathIndices": merkle_positions,
+            "salt": str(secrets.randbits(128)),  # Private salt for nullifier
+            "epoch": str(epoch),  # Public epoch for authenticity circuit
         }
+
+        bundle = self._run("prove", "authenticity", payload)
+        public_inputs = bundle.get("namedSignals", {})
         
-        if merkle_proof:
-            proof_data["merkle_proof"] = merkle_proof
-        
-        # Sign the proof
-        proof_signature = self._sign_proof(proof_data)
-        proof_data["signature"] = proof_signature
-        
-        public_inputs = {
-            "merkle_root": merkle_root,
-            "document_hash": document_hash
-        }
-        
+        # Extract epoch and nullifier from public signals
+        public_signals = bundle.get("publicSignals", [])
+        epoch_out = int(public_signals[-2]) if len(public_signals) >= 2 else None
+        nullifier = public_signals[-1] if public_signals else None
+
         return {
-            "proof_data": json.dumps(proof_data),
+            "proof_data": json.dumps(bundle),
             "public_inputs": json.dumps(public_inputs),
-            "proof_type": "authenticity_proof"
+            "proof_type": "authenticity_proof",
+            "epoch": epoch_out,  # For freshness checks
+            "nullifier": nullifier,  # For nullifier tracking
         }
-    
+
     def verify_authenticity_proof(
         self,
         proof_data: str,
-        public_inputs: str
+        public_inputs: str = "",
+        check_nullifier: bool = True,
+        current_epoch: Optional[int] = None,
     ) -> bool:
         """
-        Verify a document authenticity proof.
+        Verify zkSNARK authenticity proof with nullifier and epoch checks.
         
         Args:
-            proof_data: JSON string of proof data
-            public_inputs: JSON string of public inputs
-            
+            proof_data: JSON string containing proof bundle
+            public_inputs: JSON string containing public inputs (unused, kept for compatibility)
+            check_nullifier: If True, check nullifier hasn't been used (one-time use)
+            current_epoch: Current epoch number (for freshness enforcement)
+        
         Returns:
-            True if proof is valid, False otherwise
+            True if proof is valid, nullifier not used, and epoch is current
         """
         try:
-            proof = json.loads(proof_data)
-            inputs = json.loads(public_inputs)
-            
-            # Verify proof type
-            if proof.get("proof_type") != "authenticity_proof":
-                return False
-            
-            # Verify document hash matches
-            if proof.get("document_hash") != inputs.get("document_hash"):
-                return False
-            
-            # Verify merkle root matches
-            if proof.get("merkle_root") != inputs.get("merkle_root"):
-                return False
-            
-            # Verify signature
-            if not self._verify_proof_signature(proof):
-                return False
-            
-            # If Merkle proof provided, verify it
-            if "merkle_proof" in proof:
-                if not self._verify_merkle_proof(
-                    inputs.get("document_hash"),
-                    proof.get("merkle_proof"),
-                    inputs.get("merkle_root")
-                ):
-                    return False
-            
-            return True
-        except Exception as e:
-            print(f"Error verifying authenticity proof: {e}")
+            bundle = json.loads(proof_data)
+        except Exception:
             return False
-    
-    def _sign_proof(self, proof_data: Dict[str, Any]) -> str:
-        """
-        Sign proof data (simplified implementation).
-        In production, use proper ZK signature scheme.
-        """
-        # Create a deterministic signature from proof data
-        proof_str = json.dumps(proof_data, sort_keys=True)
-        signature = hashlib.sha256(proof_str.encode()).hexdigest()
-        return signature
-    
-    def _verify_proof_signature(self, proof: Dict[str, Any]) -> bool:
-        """Verify proof signature."""
-        signature = proof.get("signature")
-        if not signature:
+
+        # Extract epoch and nullifier from public signals
+        public_signals = bundle.get("publicSignals", [])
+        if len(public_signals) < 2:
             return False
         
-        # Create a copy without signature for verification
-        proof_copy = {k: v for k, v in proof.items() if k != "signature"}
+        epoch_out = int(public_signals[-2])  # Second-to-last signal
+        nullifier = public_signals[-1]  # Last signal
         
-        # Recompute signature
-        expected_signature = self._sign_proof(proof_copy)
+        # Enforce freshness: require current epoch (if specified)
+        if current_epoch is not None and epoch_out < current_epoch:
+            return False  # Proof from old epoch
         
-        return signature == expected_signature
-    
-    def _verify_merkle_proof(
-        self,
-        leaf_hash: str,
-        merkle_proof: list,
-        root_hash: str
-    ) -> bool:
-        """
-        Verify a Merkle proof.
-        
-        Args:
-            leaf_hash: Hash of the leaf node
-            merkle_proof: List of (hash, position) tuples for proof path
-            root_hash: Expected root hash
+        # Check nullifier hasn't been used (one-time use prevention)
+        if check_nullifier:
+            from vault.nullifier_storage import verify_nullifier_not_used, mark_nullifier_used
             
-        Returns:
-            True if proof is valid
-        """
-        current_hash = leaf_hash
+            if not verify_nullifier_not_used(nullifier, epoch=epoch_out):
+                return False  # Nullifier already used
         
-        for sibling_hash, is_right in merkle_proof:
-            if is_right:
-                # Sibling is on the right
-                combined = current_hash + sibling_hash
-            else:
-                # Sibling is on the left
-                combined = sibling_hash + current_hash
+        # Verify proof
+        try:
+            result = self._run("verify", "authenticity", bundle)
+            verified = bool(result.get("verified"))
             
-            current_hash = hashlib.sha256(combined.encode()).hexdigest()
-        
-        return current_hash == root_hash
+            # Mark nullifier as used AFTER successful verification
+            if verified and check_nullifier:
+                from vault.nullifier_storage import mark_nullifier_used
+                mark_nullifier_used(nullifier, epoch=epoch_out)
+            
+            return verified
+        except Exception:
+            return False
 

@@ -31,11 +31,20 @@ This document describes the complete architecture of the Honestly Truth Engine p
 │  │ GraphQL Backend     │      │  Python Backend         │   │
 │  │ (Node.js/Apollo)    │◀────▶│  (FastAPI)             │   │
 │  │                     │      │                         │   │
-│  │ - App Verification  │      │ - Vault Management      │   │
-│  │ - Scoring Engine    │      │ - ZK Proofs             │   │
-│  │ - Claims/Evidence   │      │ - Kafka Integration     │   │
-│  │ - Provenance        │      │ - FAISS Search          │   │
-│  └─────────────────────┘      └────────────────────────┘   │
+│  │ - App Verification  │      │ ┌────────────────────┐ │   │
+│  │ - Scoring Engine    │      │ │ Security Middleware│ │   │
+│  │ - Claims/Evidence   │      │ │ - Threat Detection │ │   │
+│  │ - Provenance        │      │ │ - Rate Limiting     │ │   │
+│  └─────────────────────┘      │ │ - IP Blocking      │ │   │
+│                                 │ └────────────────────┘ │   │
+│                                 │                         │   │
+│                                 │ - Vault Management      │   │
+│                                 │ - ZK Proofs (Groth16)   │   │
+│                                 │ - AI Endpoints (/ai/*) │   │
+│                                 │ - Monitoring (/monitoring/*)│
+│                                 │ - Kafka Integration     │   │
+│                                 │ - FAISS Search          │   │
+│                                 └────────────────────────┘   │
 └────────────┬──────────────────────────┬────────────────────┘
              │                          │
              ▼                          ▼
@@ -45,6 +54,14 @@ This document describes the complete architecture of the Honestly Truth Engine p
 │  │ PostgreSQL   │  │  Neo4j    │  │  Kafka           │    │
 │  │              │  │  Graph DB │  │  Event Stream    │    │
 │  └──────────────┘  └───────────┘  └──────────────────┘    │
+│                                                              │
+│  ┌──────────────────┐  ┌──────────────────────────────┐  │
+│  │  Redis Cache     │  │  Monitoring & Metrics        │  │
+│  │  (Optional)      │  │  - Health Checks             │  │
+│  │  - VKeys         │  │  - Performance Metrics       │  │
+│  │  - Share Bundles │  │  - Security Events           │  │
+│  │  - Metadata      │  │  - System Resources          │  │
+│  └──────────────────┘  └──────────────────────────────┘  │
 └────────────┬────────────────────────────────────────────────┘
              │
              ▼
@@ -245,33 +262,69 @@ Graph-based claim and provenance storage:
 
 ## 🔐 Security Architecture
 
-### Authentication & Authorization
+### Security Middleware Layer
 
 ```
 ┌─────────────┐
 │   Client    │
 └──────┬──────┘
-       │ 1. Login Request
+       │ 1. HTTP Request
        ▼
+┌─────────────────────────────────────┐
+│     Security Middleware             │
+│  ┌───────────────────────────────┐  │
+│  │ Threat Detection             │  │
+│  │ - XSS/SQL Injection Detection│  │
+│  │ - Path Traversal Prevention  │  │
+│  │ - Suspicious Pattern Matching│  │
+│  └───────────────────────────────┘  │
+│  ┌───────────────────────────────┐  │
+│  │ Rate Limiting                 │  │
+│  │ - Per-endpoint limits         │  │
+│  │ - IP-based tracking          │  │
+│  └───────────────────────────────┘  │
+│  ┌───────────────────────────────┐  │
+│  │ IP Blocking                   │  │
+│  │ - Automatic blocking          │  │
+│  │ - Threat threshold tracking  │  │
+│  └───────────────────────────────┘  │
+│  ┌───────────────────────────────┐  │
+│  │ Security Headers              │  │
+│  │ - CSP, HSTS, XSS Protection  │  │
+│  │ - Frame Options, Referrer     │  │
+│  └───────────────────────────────┘  │
+└──────────────┬───────────────────────┘
+               │ 2. Validated Request
+               ▼
 ┌─────────────┐
-│   Auth      │
-│   Service   │──────▶ JWT Token Generated
-└──────┬──────┘
-       │ 2. JWT Returned
-       ▼
-┌─────────────┐
-│   Client    │──────▶ Stores JWT
-└──────┬──────┘
-       │ 3. API Requests (with JWT)
-       ▼
-┌─────────────┐
-│  Backend    │──────▶ Validates JWT
-│  Middleware │
+│  Backend    │
+│  Handler    │
 └─────────────┘
 ```
 
-**Current State**: MVP mode (no auth)
-**Future**: JWT-based authentication
+### Authentication & Authorization
+
+**AI Endpoints**: API key authentication (`X-API-Key` header)
+```python
+# AI endpoint authentication
+def validate_api_key(x_api_key: str = Header(None)):
+    expected_key = os.getenv("AI_API_KEY")
+    if x_api_key != expected_key:
+        raise HTTPException(401, "Invalid API key")
+    return x_api_key
+```
+
+**Vault Endpoints**: User-based authentication (MVP: mock user ID)
+**Future**: JWT-based authentication for all endpoints
+
+### Security Features
+
+- **Threat Detection**: Automatic detection of XSS, SQL injection, path traversal
+- **Rate Limiting**: Per-endpoint limits (20-100 req/min)
+- **IP Blocking**: Automatic blocking after 5 suspicious requests
+- **Security Headers**: CSP, HSTS, XSS protection, frame options
+- **Input Validation**: Token format, document ID, string sanitization
+- **Audit Logging**: All security events logged and monitored
 
 ### Data Encryption
 
@@ -281,20 +334,44 @@ Graph-based claim and provenance storage:
 
 ### Zero-Knowledge Proofs
 
+Production-ready Groth16 circuits for privacy-preserving verification:
+
 ```python
-# Simplified ZK proof for age verification
-def generate_age_proof(birth_date, threshold):
+# Age verification proof (Groth16)
+def generate_age_proof(birth_date, min_age, document_hash):
     """
-    Proves age >= threshold without revealing birth_date
+    Proves age >= min_age without revealing birth_date.
+    Uses Groth16 SNARK for fast verification (<1s).
     """
-    age = calculate_age(birth_date)
-    proof = {
-        'statement': f'age >= {threshold}',
-        'valid': age >= threshold,
-        'commitment': hash(birth_date + salt)
-    }
+    # Circuit: age.circom
+    # Prover: snarkjs
+    # Verification: <0.2s (cached vkeys)
+    proof = zk_service.generate_age_proof(
+        birth_date=birth_date,
+        min_age=min_age,
+        document_hash=document_hash
+    )
+    return proof
+
+# Document authenticity proof (Groth16)
+def generate_authenticity_proof(document_hash, merkle_root, merkle_proof):
+    """
+    Proves document hash exists in Merkle tree without revealing content.
+    Uses Poseidon hash for constraint efficiency.
+    """
+    proof = zk_service.generate_authenticity_proof(
+        document_hash=document_hash,
+        merkle_root=merkle_root,
+        merkle_proof=merkle_proof
+    )
     return proof
 ```
+
+**Circuit Details**:
+- **Age Circuit**: Poseidon commitment, timestamp comparison
+- **Authenticity Circuit**: Poseidon Merkle inclusion proof (depth 16)
+- **Verification**: Groth16 with BLS12-381 curve
+- **Performance**: <1s verification, <0.2s with caching
 
 ## 🚦 API Endpoints
 
@@ -311,16 +388,34 @@ GET /health
 ### Python Backend (Port 8000)
 
 ```
-# REST API
+# REST API - Vault Operations
 POST   /vault/upload
-GET    /vault/documents
-POST   /vault/proof
-GET    /vault/share/{share_id}
+GET    /vault/document/{document_id}
+GET    /vault/share/{token}
+GET    /vault/share/{token}/bundle
+GET    /vault/qr/{token}
 
-# GraphQL (Strawberry)
+# AI Endpoints - Structured APIs
+POST   /ai/verify-proof
+POST   /ai/verify-proofs-batch
+POST   /ai/share-link
+GET    /ai/share/{token}/info
+GET    /ai/status
+
+# Monitoring & Health
+GET    /health
+GET    /monitoring/health
+GET    /monitoring/metrics
+GET    /monitoring/security/events
+GET    /monitoring/security/threats
+
+# GraphQL (Ariadne)
 POST   /graphql
 
-# Docs
+# Static Assets
+GET    /zkp/artifacts/{circuit}/verification_key.json
+
+# Docs (if enabled)
 GET    /docs
 GET    /redoc
 ```
@@ -387,27 +482,70 @@ GET    /redoc
 
 ## 📊 Monitoring & Observability
 
-### Metrics
+### Health Checks
 
-- **Application**: Response times, error rates
-- **Infrastructure**: CPU, memory, disk
-- **Business**: Apps verified, claims processed
+**Lightweight Health Check** (`/health`):
+- Response time: <0.05s
+- Use case: Load balancer health checks
+- Returns: `{"status": "healthy"}`
+
+**Comprehensive Health Check** (`/monitoring/health`):
+- System metrics: CPU, memory, disk
+- Service status: Database, cache
+- Performance metrics: Response times, error rates
+
+### Metrics Endpoints
+
+**Performance Metrics** (`/monitoring/metrics`):
+- Request count, error count
+- Average, P95, P99 response times
+- Cache statistics (hit rate, backend)
+
+**Security Events** (`/monitoring/security/events`):
+- Suspicious input detection
+- Rate limit violations
+- IP blocking events
+- Failed authentication attempts
+
+### Caching Layer
+
+**Redis Cache** (with in-memory fallback):
+- Verification keys: Cached indefinitely (immutable)
+- Share bundles: 60s TTL
+- Document metadata: 5min TTL
+- Attestations: 10min TTL
+
+**Performance Impact**:
+- Share bundle: <0.2s (cached)
+- Proof verification: <0.2s (cached vkeys)
+- Cache hit rate: Target >80%
 
 ### Logging
 
-```javascript
-// Winston structured logging
-logger.info('App verified', {
-  appId,
-  platform,
-  score,
-  duration: elapsed
-});
+**Structured Logging**:
+```python
+# Python structured logging
+logger.info('Proof verified', extra={
+    'proof_type': 'age_proof',
+    'verified': True,
+    'response_time_ms': 125,
+    'request_id': 'abc123'
+})
+```
+
+**Security Event Logging**:
+```python
+log_security_event(
+    event_type='suspicious_input',
+    details={'ip': '192.168.1.100', 'pattern': 'XSS'},
+    severity='warning'
+)
 ```
 
 ### Tracing
 
-Future: OpenTelemetry for distributed tracing
+**Current**: Request ID tracking via `X-Request-ID` header  
+**Future**: OpenTelemetry for distributed tracing
 
 ## 🔮 Future Enhancements
 

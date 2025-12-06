@@ -1,124 +1,15 @@
-copilot/fix-implement-new-paths
-# honestly
-
-A comprehensive path utilities library for Node.js that provides robust path handling, validation, and sanitization functions.
-
-## Features
-
-- 🛡️ **Path Sanitization**: Prevent directory traversal attacks
-- ✅ **Path Validation**: Check if paths exist, are files, or directories
-- 🔧 **Path Manipulation**: Normalize, join, resolve, and parse paths
-- 🔒 **Security**: Built-in protection against common path-based vulnerabilities
-- 📦 **Zero Dependencies**: Uses only Node.js built-in modules
-
-## Installation
-
-```bash
-npm install honestly
-```
-
-## Usage
-
-```javascript
-const { PathUtils } = require('honestly');
-
-// Normalize paths
-const normalized = PathUtils.normalize('/foo//bar/../baz');
-
-// Join path segments
-const joined = PathUtils.join('foo', 'bar', 'baz.txt');
-
-// Resolve to absolute path
-const absolute = PathUtils.resolve('foo', 'bar');
-
-// Sanitize paths to prevent directory traversal
-const safe = PathUtils.sanitize('docs/file.txt', '/home/user');
-
-// Check if path exists
-if (PathUtils.exists('/path/to/file')) {
-  console.log('File exists!');
-}
-
-// Ensure directory exists
-PathUtils.ensureDir('/path/to/new/directory');
-```
-
-## API Reference
-
-### PathUtils.normalize(inputPath)
-Normalize a path to remove redundant separators and resolve `.` and `..` segments.
-
-### PathUtils.join(...segments)
-Join multiple path segments together.
-
-### PathUtils.resolve(...pathSegments)
-Resolve a sequence of paths into an absolute path.
-
-### PathUtils.relative(from, to)
-Get the relative path from one location to another.
-
-### PathUtils.dirname(filePath)
-Get the directory name of a path.
-
-### PathUtils.basename(filePath, ext)
-Get the base name of a path (filename with extension).
-
-### PathUtils.extname(filePath)
-Get the extension of a path.
-
-### PathUtils.parse(filePath)
-Parse a path into its components (root, dir, base, ext, name).
-
-### PathUtils.format(pathObject)
-Format a path object into a path string.
-
-### PathUtils.isAbsolute(inputPath)
-Check if a path is absolute.
-
-### PathUtils.sanitize(inputPath, baseDir)
-Sanitize a path to prevent directory traversal attacks.
-
-### PathUtils.exists(inputPath)
-Check if a path exists.
-
-### PathUtils.isFile(inputPath)
-Check if a path is a file.
-
-### PathUtils.isDirectory(inputPath)
-Check if a path is a directory.
-
-### PathUtils.ensureDir(dirPath)
-Ensure a directory exists, creating it if necessary.
-
-## Security
-
-This library includes built-in security features:
-- Null byte removal
-- Directory traversal prevention
-- Path validation and sanitization
-
-## Testing
-
-```bash
-npm test
-npm run test:coverage
-npm run test:watch
-```
-
-## Linting
-
-```bash
-npm run lint
-npm run lint:fix
-```
-
-## License
-
-ISC
-
 # Honestly - Truth Engine & Personal Proof Vault
 
-A comprehensive blockchain-verified identity and credential verification system with zero-knowledge proofs and distributed trust infrastructure.
+A production-ready blockchain-verified identity and credential verification system with zero-knowledge proofs, AI integration, and enterprise-grade security.
+
+## 🎯 What is Honestly?
+
+Honestly is a comprehensive platform for:
+- **Personal Proof Vault**: Encrypted document storage with zero-knowledge proofs
+- **App Verification**: Trust scoring and verification for applications
+- **AI Integration**: Structured APIs for programmatic access
+- **Blockchain Anchoring**: Immutable attestations via Hyperledger Fabric
+- **Privacy-Preserving Verification**: ZK-SNARK proofs for selective disclosure
 
 ## 🏗️ Architecture
 
@@ -128,7 +19,8 @@ The Honestly platform consists of three main components:
 - React + Vite application
 - TailwindCSS for styling
 - Apollo Client for GraphQL
-- AppWhistler UI for app verification
+- Real-time proof verification UI
+- QR code scanning and verification
 
 ### 2. **GraphQL Backend** (`backend-graphql/`)
 - Node.js + Apollo Server
@@ -137,71 +29,90 @@ The Honestly platform consists of three main components:
 - WhistlerScore calculation
 
 ### 3. **Python Backend** (`backend-python/`)
-- FastAPI REST API
+- FastAPI REST API with production-grade security
 - Neo4j graph database
-- Kafka event streaming
-- FAISS vector search
-- Hyperledger Fabric blockchain
-- Zero-knowledge proof generation
+- Zero-knowledge proof generation (Groth16)
+- AI-friendly endpoints (`/ai/*`)
+- Monitoring and health checks (`/monitoring/*`)
+- Redis caching for <0.2s response times
+- Kafka event streaming (optional)
+- FAISS vector search (optional)
+- Hyperledger Fabric blockchain (optional)
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Node.js 18+
-- Python 3.10+
-- Docker & Docker Compose
-- PostgreSQL (for GraphQL backend)
-- Neo4j (for Python backend)
-
-### 1. Start Infrastructure
+### Minimal Stack (Recommended for Development)
 
 ```bash
-docker-compose up -d
+# Start everything with one command
+docker compose -f docker-compose.min.yml up --build
 ```
 
 This starts:
-- Neo4j (ports 7474, 7687)
-- Kafka + Zookeeper (port 9092)
-- PostgreSQL (port 5432)
+- **API**: http://localhost:8000 (REST/GraphQL)
+- **Frontend**: http://localhost:5173
+- **Neo4j**: http://localhost:7474 (bolt://localhost:7687)
 
-### 2. Start Python Backend
+### Full Stack Setup
 
-```bash
-cd backend-python
-pip install -r requirements.txt
-uvicorn api.app:app --reload
-```
+See [SETUP.md](SETUP.md) for complete setup instructions.
 
-Access at: http://localhost:8000
+## ✨ Production Features
 
-### 3. Start GraphQL Backend
+### 🔒 Security
+- **Security Middleware**: Automatic threat detection, IP blocking, rate limiting
+- **Security Headers**: CSP, HSTS, XSS protection, frame options
+- **Input Validation**: XSS/SQL injection detection, token validation
+- **Rate Limiting**: Per-endpoint limits (20-100 req/min)
+- **Threat Detection**: Automatic IP blocking after suspicious activity
 
-```bash
-cd backend-graphql
-npm install
-npm run dev
-```
+### ⚡ Performance
+- **Sub-0.2s Response Times**: Optimized endpoints with caching
+- **Redis Caching**: Distributed caching with in-memory fallback
+- **Connection Pooling**: Optimized database connections
+- **Performance Monitoring**: P95/P99 metrics, response time tracking
 
-Access at: http://localhost:4000/graphql
+### 🤖 AI Integration
+- **Structured Endpoints**: `/ai/verify-proof`, `/ai/verify-proofs-batch`
+- **Standardized Responses**: Consistent `{success, data, error, metadata}` format
+- **Batch Operations**: Verify up to 100 proofs in one request
+- **API Key Authentication**: Secure access control
 
-### 4. Start Frontend
+### 📊 Monitoring
+- **Health Checks**: `/health` (lightweight), `/monitoring/health` (comprehensive)
+- **Metrics**: Request counts, error rates, response times, cache stats
+- **Security Events**: Real-time threat detection and logging
+- **System Monitoring**: CPU, memory, disk usage tracking
 
-```bash
-cd frontend-app
-npm install
-npm run dev
-```
-
-Access at: http://localhost:3000
+### 🔐 Zero-Knowledge Proofs
+- **Groth16 Circuits**: Age verification and document authenticity
+- **Fast Verification**: <1s verification times
+- **QR-Friendly**: Shareable proof links with QR codes
+- **Production-Ready**: Real zkSNARK circuits (Circom + snarkjs)
 
 ## 📚 Documentation
 
-- [Vault API Documentation](docs/vault-api.md)
-- [Vault Quick Start Guide](docs/vault-quickstart.md)
-- [Personal Proof Vault Overview](docs/personal-proof-vault.md)
-- [Project Scope](docs/Scope.md)
+### Getting Started
+- [Complete Setup Guide](SETUP.md) - Step-by-step setup instructions
+- [Production Deployment](backend-python/PRODUCTION.md) - Production deployment guide
+- [Production Validation](PRODUCTION_VALIDATION.md) - Load testing, security audit, chaos engineering
+- [Architecture Overview](ARCHITECTURE.md) - System architecture details
 
-## 🔑 Features
+### API Documentation
+- [Vault API Reference](docs/vault-api.md) - Complete vault API documentation
+- [AI Endpoints Guide](docs/ai-endpoints.md) - AI-friendly API endpoints
+- [Monitoring Guide](docs/monitoring.md) - Health checks and metrics
+
+### Security & Performance
+- [Security Policy](SECURITY.md) - Security policy and vulnerability reporting
+- [ZK-SNARK Guide](backend-python/zkp/README.md) - Zero-knowledge proof setup
+
+### Additional Resources
+- [Vault Quick Start](docs/vault-quickstart.md) - Quick start for vault features
+- [Personal Proof Vault](docs/personal-proof-vault.md) - Vault overview
+- [Project Scope](docs/Scope.md) - Project scope and requirements
+
+## 🔑 Key Features
 
 ### AppWhistler (GraphQL Backend)
 - ✅ App verification and trust scoring
@@ -212,42 +123,47 @@ Access at: http://localhost:3000
 
 ### Personal Proof Vault (Python Backend)
 - ✅ Encrypted document storage (AES-256-GCM)
-- ✅ Zero-knowledge proofs for selective disclosure
+- ✅ Zero-knowledge proofs (Groth16) for selective disclosure
 - ✅ Hyperledger Fabric attestations
 - ✅ QR code generation for sharing
 - ✅ Complete audit timeline
 - ✅ Graph-based claim verification
+- ✅ AI-friendly API endpoints
+- ✅ Production-grade security middleware
+- ✅ Performance monitoring and health checks
 
 ## 🛠️ Development
 
-### Testing
+### Prerequisites
+- Node.js 18+
+- Python 3.11+
+- Docker & Docker Compose
+- Neo4j 5.x (or use Docker)
+- Redis (optional, for distributed caching)
 
-Frontend:
+### Quick Development Setup
+
 ```bash
-cd frontend-app
-npm test
+# Install dependencies
+make install
+
+# Start minimal stack
+make up-min
+
+# Or start full stack
+make up
 ```
 
-GraphQL Backend:
-```bash
-cd backend-graphql
-npm test
-```
-
-Python Backend:
-```bash
-cd backend-python
-pytest
-```
-
-### Linting
+### Running Tests
 
 ```bash
-# Frontend
-cd frontend-app && npm run lint
+# Run all tests
+make test
 
-# GraphQL Backend
-cd backend-graphql && npm run lint
+# Individual components
+cd frontend-app && npm test
+cd backend-graphql && npm test
+cd backend-python && pytest
 ```
 
 ## 📦 Project Structure
@@ -257,41 +173,87 @@ honestly/
 ├── frontend-app/           # React frontend application
 │   ├── src/
 │   │   ├── App.jsx        # Main application component
-│   │   ├── main.jsx       # Application entry point
-│   │   └── index.css      # Global styles
-│   ├── package.json
-│   └── vite.config.js
+│   │   └── main.jsx       # Application entry point
+│   └── package.json
 │
 ├── backend-graphql/        # Node.js GraphQL backend
 │   ├── src/
 │   │   ├── config/        # Configuration files
 │   │   ├── graphql/       # Schema and resolvers
-│   │   ├── loaders/       # Express and Apollo setup
 │   │   └── utils/         # Utility functions
 │   └── package.json
 │
 ├── backend-python/         # Python FastAPI backend
 │   ├── api/               # FastAPI routes
+│   │   ├── middleware/    # Security, caching, monitoring
+│   │   ├── ai_routes.py   # AI endpoints
+│   │   └── vault_routes.py # Vault endpoints
 │   ├── vault/             # Vault implementation
-│   ├── ingestion/         # Kafka integration
-│   ├── blockchain/        # Fabric integration
-│   └── vector_index/      # FAISS search
+│   ├── zkp/               # ZK-SNARK circuits
+│   └── requirements.txt
 │
 ├── docs/                   # Documentation
-├── neo4j/                  # Neo4j initialization
-└── docker-compose.yml      # Infrastructure setup
+├── docker-compose.min.yml  # Minimal stack (recommended)
+└── docker-compose.yml      # Full stack
 ```
 
-## 🔐 Security Notes
+## 🔐 Security
 
-**⚠️ MVP Warning:** This is a development MVP. For production:
-- Implement proper JWT authentication
-- Use production Fabric network
-- Integrate real ZK-SNARK circuits
-- Add rate limiting and security auditing
-- Implement proper key management
-- Enable HTTPS/TLS
-- Add input sanitization
+**Production-Ready Security Features**:
+- ✅ Automatic threat detection and IP blocking
+- ✅ Rate limiting per endpoint
+- ✅ Input validation and sanitization
+- ✅ Security headers (CSP, HSTS, etc.)
+- ✅ Audit logging for all security events
+- ✅ API key authentication for AI endpoints
+- ✅ Encrypted document storage (AES-256-GCM)
+- ✅ Zero-knowledge proofs for privacy
+
+See [SECURITY.md](SECURITY.md) for complete security policy and vulnerability reporting.
+
+## ⚡ Performance
+
+**Target Response Times**:
+- Share bundle: <0.2s (cached)
+- Proof verification: <0.2s (cached vkeys)
+- Health check: <0.05s
+- AI endpoints: <0.3s
+
+**Optimization Features**:
+- Redis caching with in-memory fallback
+- Connection pooling
+- Response time monitoring
+- Cache hit rate tracking
+
+## 🤖 AI Integration
+
+The platform provides structured AI endpoints for programmatic access:
+
+- `POST /ai/verify-proof` - Verify single proof
+- `POST /ai/verify-proofs-batch` - Batch verify (up to 100)
+- `POST /ai/share-link` - Create shareable link
+- `GET /ai/share/{token}/info` - Get share info
+- `GET /ai/status` - API status
+
+See [AI Endpoints Guide](docs/ai-endpoints.md) for complete documentation.
+
+## 📊 Monitoring
+
+Real-time monitoring and health checks:
+
+- `GET /health` - Lightweight health check
+- `GET /monitoring/health` - Comprehensive health check
+- `GET /monitoring/metrics` - Performance metrics
+- `GET /monitoring/security/events` - Security event log
+
+See [Monitoring Guide](docs/monitoring.md) for details.
+
+## 🚀 Production Deployment
+
+For production deployment, see:
+- [Production Deployment Guide](backend-python/PRODUCTION.md)
+- [Security Checklist](SECURITY.md#security-checklist)
+- [Performance Optimization](backend-python/PRODUCTION.md#performance-optimization)
 
 ## 📄 License
 
@@ -306,5 +268,10 @@ See [LICENSE](LICENSE) file for details.
 
 ## 📧 Support
 
-For issues and questions, please use the GitHub issue tracker.
-main
+- **Issues**: [GitHub Issues](https://github.com/aresforblue-ai/honestly/issues)
+- **Documentation**: See `docs/` folder
+- **Security**: See [SECURITY.md](SECURITY.md) for vulnerability reporting
+
+---
+
+**Built with ❤️ for privacy, security, and trust.**

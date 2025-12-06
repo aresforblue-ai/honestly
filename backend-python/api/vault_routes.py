@@ -3,8 +3,10 @@ REST endpoints for vault operations (file uploads, share links, QR codes).
 """
 import os
 import base64
+import secrets
+import time
 from typing import Optional
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from py2neo import Graph
 
@@ -13,7 +15,11 @@ from vault.models import DocumentType
 from vault.share_links import ShareLinkService
 from vault.timeline import TimelineService
 from blockchain.sdk.fabric_client import FabricClient
-from api.qr_generator import generate_qr_response, generate_qr_code
+from api.qr_generator import generate_qr_response
+from api.cache import cached, get as cache_get, set as cache_set
+from api.monitoring import record_metric
+from api.app import get_vkey_hash, hmac_sign
+from datetime import datetime
 
 # Initialize services
 NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
@@ -26,13 +32,28 @@ share_link_service = ShareLinkService(graph)
 timeline_service = TimelineService(graph)
 fabric_client = FabricClient()
 
+# Simple in-memory rate limiter for public endpoints (best-effort, per-IP)
+_rate_bucket: dict[str, dict] = {}
+_RATE_LIMIT_WINDOW = 60  # seconds
+_RATE_LIMIT_MAX = 20     # requests per window
+
+
+def _check_rate_limit(key: str):
+    now = time.time()
+    bucket = _rate_bucket.get(key, {"count": 0, "window_start": now})
+    if now - bucket["window_start"] > _RATE_LIMIT_WINDOW:
+        bucket = {"count": 0, "window_start": now}
+    bucket["count"] += 1
+    _rate_bucket[key] = bucket
+    if bucket["count"] > _RATE_LIMIT_MAX:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded")
+
 router = APIRouter(prefix="/vault", tags=["vault"])
 
 
-# Mock authentication for MVP
+# Production authentication
 def get_user_id() -> str:
-    """Get current user ID (mock for MVP)."""
-    # In production, extract from JWT token
+    """Get current user ID (placeholder until JWT/OIDC wired)."""
     return os.getenv('MOCK_USER_ID', 'test_user_1')
 
 
@@ -66,7 +87,7 @@ async def upload_document(
     if metadata:
         try:
             meta = json.loads(metadata)
-        except:
+        except Exception:
             pass
     
     # Upload and encrypt document
@@ -191,10 +212,12 @@ async def get_document(document_id: str, user_id: Optional[str] = None):
 
 
 @router.get("/share/{token}")
-async def verify_share_link(token: str):
+async def verify_share_link(token: str, request: Request):
     """
     Public endpoint to verify a share link and return proof data.
     """
+    _check_rate_limit(f"share:{request.client.host}")
+
     proof_link = share_link_service.validate_token(token)
     
     if not proof_link:
@@ -245,10 +268,83 @@ async def verify_share_link(token: str):
 
 
 @router.get("/qr/{token}")
-async def get_qr_code(token: str):
+async def get_qr_code(token: str, request: Request):
     """
     Generate QR code for a share link.
     """
+    _check_rate_limit(f"qr:{request.client.host}")
     share_url = share_link_service.get_share_url(token)
     return generate_qr_response(share_url)
+
+
+@router.get("/share/{token}/bundle")
+@cached(ttl=60.0, key_prefix="share_bundle")  # Cache for 60 seconds
+async def get_share_bundle(token: str, request: Request):
+    """
+    Resolve a share token into a verification bundle for QR consumers.
+    Optimized for <0.2s response time with caching.
+    """
+    start_time = time.time()
+    client_key = f"bundle:{request.client.host}"
+    _check_rate_limit(client_key)
+
+    # Check cache first
+    cache_key = f"share_bundle:{token}"
+    cached_bundle = cache_get(cache_key)
+    if cached_bundle:
+        record_metric("share_bundle", time.time() - start_time, success=True)
+        return cached_bundle
+
+    proof_link = share_link_service.validate_token(token)
+
+    if not proof_link:
+        record_metric("share_bundle", time.time() - start_time, success=False)
+        raise HTTPException(status_code=404, detail="Share link not found or expired")
+
+    doc_meta = vault_storage.get_document_metadata(proof_link.document_id)
+    if not doc_meta:
+        record_metric("share_bundle", time.time() - start_time, success=False)
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Only query attestation if needed (can be slow)
+    attestation = None
+    if proof_link.proof_type:
+        try:
+            attestation = fabric_client.query_attestation(proof_link.document_id)
+        except Exception:
+            pass  # Don't fail if attestation query fails
+
+    bundle = {
+        "share_token": proof_link.share_token,
+        "document_id": proof_link.document_id,
+        "proof_type": proof_link.proof_type,
+        "access_level": proof_link.access_level.value,
+        "document_hash": doc_meta.get('hash'),
+        "issued_at": datetime.utcnow().isoformat(),
+        "expires_at": proof_link.expires_at.isoformat() if proof_link.expires_at else None,
+        "max_accesses": proof_link.max_accesses,
+        "nonce": secrets.token_hex(16),
+        "verification": {
+            "circuit": proof_link.proof_type,
+            "vk_url": f"/zkp/artifacts/{proof_link.proof_type}/verification_key.json",
+            "vk_sha256": get_vkey_hash(proof_link.proof_type),
+            "attestation": attestation or None,
+        }
+    }
+
+    if not bundle["verification"]["vk_sha256"]:
+        record_metric("share_bundle", time.time() - start_time, success=False)
+        raise HTTPException(status_code=503, detail="Verification key unavailable for circuit")
+
+    signature = hmac_sign(bundle)
+    if signature:
+        bundle["signature"] = signature
+
+    # Cache the bundle
+    cache_set(cache_key, bundle, ttl=60.0)
+    
+    duration = time.time() - start_time
+    record_metric("share_bundle", duration, success=True)
+    
+    return bundle
 

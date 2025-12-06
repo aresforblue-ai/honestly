@@ -1,0 +1,289 @@
+name: Production Validation
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly load test on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+env:
+  BASE_URL: http://localhost:8000
+
+jobs:
+  load-test:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup k6
+        uses: grafana/setup-k6@v3
+        with:
+          k6-version: v0.48.0
+      
+      - name: Start services
+        run: |
+          docker compose -f docker-compose.min.yml up -d
+          sleep 30  # Wait for services to be ready
+      
+      - name: Run load tests
+        run: |
+          cd backend-python/tests/load
+          k6 run --out json=results_load_test.json load_test.js
+        continue-on-error: true
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-test-results
+          path: backend-python/tests/load/results_load_test.json
+      
+      - name: Notify on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          payload: |
+            {
+              "text": "🚨 Load Test Failed",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🚨 Load Test Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n${{ github.repository }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n${{ github.ref }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n${{ github.sha }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Workflow:*\n${{ github.workflow }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                  }
+                }
+              ]
+            }
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r backend-python/tests/requirements.txt
+      
+      - name: Start services
+        run: |
+          docker compose -f docker-compose.min.yml up -d
+          sleep 30
+      
+      - name: Run security audit
+        run: |
+          cd backend-python/tests/security
+          python3 security_audit.py ${{ env.BASE_URL }}
+        continue-on-error: true
+      
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-audit-report
+          path: backend-python/tests/security/security_audit_report.json
+      
+      - name: Check for critical vulnerabilities
+        run: |
+          cd backend-python/tests/security
+          python3 -c "
+          import json
+          with open('security_audit_report.json') as f:
+              report = json.load(f)
+          critical = [v for v in report.get('vulnerabilities', []) if v.get('severity') == 'CRITICAL']
+          if critical:
+              print('CRITICAL vulnerabilities found:')
+              for v in critical:
+                  print(f\"  - {v['test']}: {v['description']}\")
+              exit(1)
+          "
+        continue-on-error: true
+      
+      - name: Notify on critical vulnerabilities
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          payload: |
+            {
+              "text": "🚨 Critical Security Vulnerabilities Found",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🚨 Critical Security Vulnerabilities Found"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Security audit found CRITICAL vulnerabilities that must be fixed immediately."
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Report>"
+                  }
+                }
+              ]
+            }
+
+  chaos-tests:
+    name: Chaos Engineering
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/staging' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r backend-python/tests/requirements.txt
+      
+      - name: Start services
+        run: |
+          docker compose -f docker-compose.min.yml up -d
+          sleep 30
+      
+      - name: Run chaos tests
+        run: |
+          cd backend-python/tests/chaos
+          python3 chaos_tests.py ${{ env.BASE_URL }}
+        continue-on-error: true
+      
+      - name: Notify on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          payload: |
+            {
+              "text": "⚠️ Chaos Test Failed",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "⚠️ Chaos Test Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "System resilience test failed. Review results."
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                  }
+                }
+              ]
+            }
+
+  generate-report:
+    name: Generate Validation Report
+    runs-on: ubuntu-latest
+    needs: [load-test, security-audit, chaos-tests]
+    if: always()
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r backend-python/tests/requirements.txt
+          pip install matplotlib pandas
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        if: always()
+      
+      - name: Generate validation report
+        run: |
+          cd backend-python/tests
+          python3 generate_validation_report.py
+        continue-on-error: true
+      
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-report
+          path: backend-python/tests/validation_report.md
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('backend-python/tests/validation_report.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Production Validation Report\n\n${report}`
+            });
+
+

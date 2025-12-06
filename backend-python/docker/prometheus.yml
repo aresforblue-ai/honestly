@@ -1,0 +1,39 @@
+# Prometheus configuration for Honestly metrics
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'honestly-production'
+    environment: 'production'
+
+scrape_configs:
+  - job_name: 'honestly-api'
+    static_configs:
+      - targets: ['api:9090']
+        labels:
+          service: 'api'
+          component: 'backend'
+    
+  - job_name: 'honestly-neo4j'
+    static_configs:
+      - targets: ['neo4j:2004']  # Neo4j Prometheus exporter port
+        labels:
+          service: 'neo4j'
+          component: 'database'
+    
+  - job_name: 'honestly-redis'
+    static_configs:
+      - targets: ['redis:9121']  # Redis Prometheus exporter port
+        labels:
+          service: 'redis'
+          component: 'cache'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+rule_files:
+  - '/etc/prometheus/alerts.yml'
+
+

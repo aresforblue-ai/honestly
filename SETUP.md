@@ -92,6 +92,19 @@ cd frontend-app
 npm run dev
 ```
 
+## 🚦 Minimal Stack (simpler dev)
+If you just need the Python API + Neo4j + frontend without Kafka/Postgres/Fabric/FAISS:
+
+```bash
+docker compose -f docker-compose.min.yml up --build
+```
+
+- Backend API: http://localhost:8000 (REST/GraphQL on FastAPI)
+- Frontend: http://localhost:5173
+- Neo4j Browser: http://localhost:7474 (bolt://localhost:7687, neo4j/test)
+
+This uses a single compose file and disables the heavier services.
+
 ## 🌐 Access Applications
 
 Once all services are running:
@@ -100,6 +113,20 @@ Once all services are running:
 - **GraphQL API**: http://localhost:4000/graphql
 - **Python REST API**: http://localhost:8000/docs
 - **Neo4j Browser**: http://localhost:7474 (user: neo4j, pass: test)
+
+### Environment Hygiene
+- `ALLOWED_ORIGINS` (default `http://localhost:5173`) controls CORS for the Python API.
+- `ENABLE_CORS=true|false` toggles CORS middleware.
+- `STRICT_CORS=true` will require ALLOWED_ORIGINS to be set (fails fast otherwise).
+- `RATE_LIMIT_WINDOW`, `RATE_LIMIT_MAX`, `RATE_LIMIT_PATHS` tune public GET rate limiting (defaults cover `/vault/share` and `/zkp/artifacts`).
+- `DISABLE_KAFKA`, `DISABLE_FAISS`, `DISABLE_FABRIC` can be set to disable unused services in code paths.
+- Verification keys are served from `/zkp/artifacts/...`; replace placeholder files with real generated keys for production.
+- Sample zk inputs/proofs live in `backend-python/zkp/samples/` for quick local runs.
+- Performance/load: k6 script at `tests/perf/k6-load.js` (target p99 < 200ms). Run with `make perf-k6` and set `BASE_URL`.
+
+### ZK build shortcuts
+- `make zkp-build` — builds circuits, zkeys, and exports verification keys (requires circom/snarkjs locally).
+- `make zkp-verify` — generates and verifies sample proofs using the sample inputs.
 
 ## 🔧 Detailed Setup Instructions
 

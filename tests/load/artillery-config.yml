@@ -1,0 +1,97 @@
+config:
+  target: 'http://localhost:8000'
+  phases:
+    # Warm-up phase
+    - duration: 30
+      arrivalRate: 1
+      name: "Warm-up"
+    
+    # Ramp-up to 100 users
+    - duration: 120
+      arrivalRate: 1
+      rampTo: 100
+      name: "Ramp-up to 100 users"
+    
+    # Hold at 100 users for 5 minutes
+    - duration: 300
+      arrivalRate: 100
+      name: "Sustained load (100 users)"
+    
+    # Spike test: jump to 500 users instantly
+    - duration: 1
+      arrivalRate: 500
+      name: "Spike to 500 users"
+    
+    # Hold spike for 2 minutes
+    - duration: 120
+      arrivalRate: 500
+      name: "Sustained spike (500 users)"
+    
+    # Cool down
+    - duration: 60
+      arrivalRate: 100
+      rampTo: 0
+      name: "Cool down"
+  
+  processor: "./artillery-processor.js"
+  
+  plugins:
+    expect: {}
+    metrics-by-endpoint:
+      stripQueryString: true
+  
+  ensure:
+    maxErrorRate: 1  # Max 1% error rate
+    p95: 200  # 95th percentile < 200ms
+    p99: 200  # 99th percentile < 200ms
+
+scenarios:
+  - name: "Realistic user behavior"
+    weight: 100
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200
+            - contentType: json
+            - hasProperty: status
+      
+      - think: 1  # Think time 1 second
+      
+      - get:
+          url: "/health/ready"
+          expect:
+            - statusCode: [200, 503]
+      
+      - think: 2
+      
+      - get:
+          url: "/vault/share/test-token-123/bundle"
+          expect:
+            - statusCode: [200, 404, 429]
+      
+      - think: 1
+      
+      - post:
+          url: "/graphql"
+          json:
+            query: |
+              query {
+                myDocuments {
+                  id
+                  documentType
+                  hash
+                }
+              }
+          expect:
+            - statusCode: 200
+            - contentType: json
+      
+      - think: 3
+      
+      - get:
+          url: "/health/metrics"
+          expect:
+            - statusCode: 200
+
+

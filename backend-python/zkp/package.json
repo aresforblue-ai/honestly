@@ -1,0 +1,44 @@
+{
+  "name": "honestly-zkp",
+  "version": "0.1.0",
+  "description": "Groth16 zkSNARK circuits and runner for the Honestly vault",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:age": "circom circuits/age.circom --r1cs --wasm --sym -o artifacts/age",
+    "build:auth": "circom circuits/authenticity.circom --r1cs --wasm --sym -o artifacts/authenticity",
+    "build:age-level3": "circom circuits/age_level3.circom --r1cs --wasm --sym -o artifacts/age_level3",
+    "build:inequality-level3": "circom circuits/Level3Inequality.circom --r1cs --wasm --sym -o artifacts/level3_inequality",
+    "setup:age": "snarkjs groth16 setup artifacts/age/age.r1cs artifacts/common/pot16_final.ptau artifacts/age/age_0000.zkey",
+    "setup:auth": "snarkjs groth16 setup artifacts/authenticity/authenticity.r1cs artifacts/common/pot16_final.ptau artifacts/authenticity/authenticity_0000.zkey",
+    "setup:age-level3": "snarkjs groth16 setup artifacts/age_level3/age_level3.r1cs artifacts/common/pot16_final.ptau artifacts/age_level3/age_level3_0000.zkey",
+    "setup:inequality-level3": "snarkjs groth16 setup artifacts/level3_inequality/Level3Inequality.r1cs artifacts/common/pot16_final.ptau artifacts/level3_inequality/Level3Inequality_0000.zkey",
+    "contribute:age": "snarkjs zkey contribute artifacts/age/age_0000.zkey artifacts/age/age_final.zkey -n \"local\"",
+    "contribute:auth": "snarkjs zkey contribute artifacts/authenticity/authenticity_0000.zkey artifacts/authenticity/authenticity_final.zkey -n \"local\"",
+    "contribute:age-level3": "snarkjs zkey contribute artifacts/age_level3/age_level3_0000.zkey artifacts/age_level3/age_level3_final.zkey -n \"level3\"",
+    "contribute:inequality-level3": "snarkjs zkey contribute artifacts/level3_inequality/Level3Inequality_0000.zkey artifacts/level3_inequality/Level3Inequality_final.zkey -n \"level3\"",
+    "vk:age": "snarkjs zkey export verificationkey artifacts/age/age_final.zkey artifacts/age/verification_key.json",
+    "vk:auth": "snarkjs zkey export verificationkey artifacts/authenticity/authenticity_final.zkey artifacts/authenticity/verification_key.json",
+    "vk:age-level3": "snarkjs zkey export verificationkey artifacts/age_level3/age_level3_final.zkey artifacts/age_level3/verification_key.json",
+    "vk:inequality-level3": "snarkjs zkey export verificationkey artifacts/level3_inequality/Level3Inequality_final.zkey artifacts/level3_inequality/verification_key.json",
+    "verify-circuit:age-level3": "bash scripts/verify_circuit.sh circuits/age_level3.circom",
+    "verify-circuit:inequality-level3": "bash scripts/verify_circuit.sh circuits/Level3Inequality.circom",
+    "setup-level3": "bash scripts/setup_level3.sh",
+    "prove:age": "node snark-runner.js prove age",
+    "prove:auth": "node snark-runner.js prove authenticity",
+    "verify:age": "node snark-runner.js verify age",
+    "verify:auth": "node snark-runner.js verify authenticity",
+    "poseidon:hash": "node poseidon-hash.js --inputs 1,2,3",
+    "test": "python3 tests/test_circuits.py",
+    "test:all": "bash tests/run_tests.sh"
+  },
+  "dependencies": {
+    "circomlibjs": "^0.0.8",
+    "commander": "^11.0.0",
+    "snarkjs": "^0.7.3"
+  },
+  "devDependencies": {
+    "circomlib": "^2.0.5"
+  }
+}
+

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useParams } from 'react-router-dom';
 import { ApolloClient, InMemoryCache, ApolloProvider, useQuery, gql } from '@apollo/client';
+import { groth16 } from 'snarkjs';
 import { Shield, Search, CheckCircle, AlertTriangle, FileJson, Lock, Activity, Eye, Server, Terminal } from 'lucide-react';
 
 // --- 1. CONFIGURATION & CLIENT ---
@@ -14,6 +15,9 @@ const getGraphQLUri = () => {
   }
   throw new Error('REACT_APP_GRAPHQL_URI environment variable is required in production');
 };
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const vkCache = new Map();
 
 const client = new ApolloClient({
   uri: getGraphQLUri(),
@@ -271,6 +275,100 @@ const AppTruthTerminal = () => {
   );
 };
 
+// --- 5. VERIFY SHARE PAGE ---
+const VerifyShare = () => {
+  const { token } = useParams();
+  const [state, setState] = useState({ status: 'Initializing', error: null, bundle: null, verified: null, circuit: null });
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        setState((s) => ({ ...s, status: 'Fetching bundle...' }));
+        const res = await fetch(`${API_BASE}/vault/share/${token}/bundle`);
+        if (!res.ok) {
+          throw new Error(`Bundle fetch failed (${res.status})`);
+        }
+        const bundle = await res.json();
+
+        // Expect proof_data JSON string or an inline proof bundle
+        const raw = bundle.proof_data || bundle.proof || bundle.bundle;
+        if (!raw) {
+          setState({ status: 'No proof found in bundle', error: 'Bundle missing proof_data', bundle, verified: null, circuit: bundle.proof_type });
+          return;
+        }
+
+        const proofBundle = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const circuit = bundle.proof_type || proofBundle.circuit || 'age';
+
+        const vkeyUrl =
+          (bundle.verification && bundle.verification.vk_url) ||
+          `${API_BASE}/zkp/artifacts/${circuit}/verification_key.json`;
+
+        setState((s) => ({ ...s, status: 'Fetching verification key...' }));
+        let vkey = vkCache.get(vkeyUrl);
+        if (!vkey) {
+          const vkRes = await fetch(vkeyUrl, { cache: 'force-cache' });
+          if (!vkRes.ok) {
+            throw new Error(`Verification key fetch failed (${vkRes.status})`);
+          }
+          vkey = await vkRes.json();
+          vkCache.set(vkeyUrl, vkey);
+        }
+
+        setState((s) => ({ ...s, status: 'Verifying proof...' }));
+        const publicSignals = proofBundle.publicSignals || proofBundle.namedSignals;
+        if (!publicSignals || !proofBundle.proof) {
+          throw new Error('Proof bundle missing proof or publicSignals');
+        }
+
+        const ok = await groth16.verify(vkey, publicSignals, proofBundle.proof);
+        setState({ status: ok ? 'Proof verified' : 'Proof failed', error: null, bundle, verified: ok, circuit });
+      } catch (err) {
+        setState((s) => ({ ...s, status: 'Verification error', error: err.message, verified: false }));
+      }
+    };
+    run();
+  }, [token]);
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-black text-white">Proof Verification</h1>
+            <p className="text-sm text-slate-400 font-mono">Token: {token}</p>
+          </div>
+          <div className={`px-3 py-1 rounded-full text-xs font-mono ${state.verified ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/40' : 'bg-slate-900 text-slate-400 border border-slate-700'}`}>
+            {state.status}
+          </div>
+        </div>
+        {state.error && (
+          <div className="mt-4 text-sm text-red-400 font-mono border border-red-500/30 bg-red-500/5 rounded p-3">
+            {state.error}
+          </div>
+        )}
+        {state.bundle && (
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-slate-900/60 border border-slate-800 rounded p-4">
+              <h3 className="text-xs uppercase tracking-wide text-slate-400 mb-2">Bundle</h3>
+              <pre className="text-[11px] text-slate-200 font-mono whitespace-pre-wrap break-all">{JSON.stringify(state.bundle, null, 2)}</pre>
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800 rounded p-4">
+              <h3 className="text-xs uppercase tracking-wide text-slate-400 mb-2">Result</h3>
+              <ul className="text-sm text-slate-200 space-y-1 font-mono">
+                <li>Verified: {state.verified === null ? 'pending' : state.verified ? 'true' : 'false'}</li>
+                <li>Circuit: {state.circuit || 'unknown'}</li>
+                <li>Access: {state.bundle.access_level}</li>
+                <li>Proof type: {state.bundle.proof_type}</li>
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // --- 5. MAIN APP LAYOUT ---
 const App = () => {
   return (
@@ -296,6 +394,7 @@ const App = () => {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/app/:id" element={<AppTruthTerminal />} />
+              <Route path="/verify/:token" element={<VerifyShare />} />
             </Routes>
           </main>
         </div>

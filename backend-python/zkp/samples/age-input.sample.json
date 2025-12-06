@@ -1,0 +1,8 @@
+{
+  "birthTs": "631152000",
+  "referenceTs": "1733443200",
+  "minAge": "18",
+  "documentHashHex": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+  "salt": "1234567890123456789"
+}
+
