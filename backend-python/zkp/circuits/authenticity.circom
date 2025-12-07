@@ -2,6 +2,7 @@
 pragma circom 2.1.6;
 
 include "../node_modules/circomlib/circuits/poseidon.circom";
+include "../node_modules/circomlib/circuits/bitify.circom";
 
 template MerklePath(depth) {
     signal input leaf;
@@ -11,24 +12,26 @@ template MerklePath(depth) {
     signal output root;
 
     var i;
-    signal hash;
-    hash <== leaf;
+    signal hash[depth + 1];
+    hash[0] <== leaf;
+
+    // Predeclare per-level signals/components
+    signal left_val[depth];
+    signal right_val[depth];
+    component p[depth];
 
     for (i = 0; i < depth; i++) {
-        signal left;
-        signal right;
+        // Linear selection to avoid non-quadratic constraints
+        left_val[i] <== pathIndices[i] * (pathElements[i] - hash[i]) + hash[i];
+        right_val[i] <== pathIndices[i] * (hash[i] - pathElements[i]) + pathElements[i];
 
-        // Select ordering based on path index
-        left <== (1 - pathIndices[i]) * hash + pathIndices[i] * pathElements[i];
-        right <== pathIndices[i] * hash + (1 - pathIndices[i]) * pathElements[i];
-
-        component p = Poseidon(2);
-        p.inputs[0] <== left;
-        p.inputs[1] <== right;
-        hash <== p.out;
+        p[i] = Poseidon(2);
+        p[i].inputs[0] <== left_val[i];
+        p[i].inputs[1] <== right_val[i];
+        hash[i + 1] <== p[i].out;
     }
 
-    root <== hash;
+    root <== hash[depth];
 }
 
 template AuthenticityProof(depth) {

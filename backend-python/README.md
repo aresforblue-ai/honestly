@@ -5,13 +5,15 @@ Production-ready Python backend for the Honestly Truth Engine, providing secure 
 ## 🚀 Features
 
 ### Core Capabilities
+
 - **FastAPI REST API** for vault operations
 - **GraphQL API** via Ariadne
-- **Zero-Knowledge Proofs** (Groth16) for privacy-preserving verification
+- **Zero-Knowledge Proofs** (Groth16) for privacy-preserving verification (age, authenticity, level3 nullifier-binding variants)
 - **Encrypted Document Storage** (AES-256-GCM)
 - **Neo4j Graph Database** integration for claims and provenance
 
 ### Production Features
+
 - **Security Middleware**: Threat detection, IP blocking, rate limiting, security headers
 - **AI Endpoints**: Structured APIs for programmatic access (`/ai/*`) with HMAC signature verification
 - **Monitoring**: Health checks, performance metrics (`/monitoring/*`), Prometheus/Grafana integration
@@ -23,6 +25,7 @@ Production-ready Python backend for the Honestly Truth Engine, providing secure 
 - **Comprehensive Testing**: ZK attack surface tests (proof replay, timestamp manipulation, field overflow, malformed Merkle paths)
 
 ### Optional Integrations
+
 - **Kafka** event streaming for data ingestion
 - **FAISS** vector search for semantic similarity
 - **Hyperledger Fabric** blockchain integration for attestations
@@ -30,6 +33,7 @@ Production-ready Python backend for the Honestly Truth Engine, providing secure 
 ## 📋 Quick Start
 
 ### Prerequisites
+
 - Python 3.11+
 - Neo4j 5.x (or use Docker)
 - Redis (optional, for distributed caching)
@@ -52,13 +56,14 @@ pip install -r requirements.txt
 uvicorn api.app:app --reload --port 8000
 ```
 
-Access at: http://localhost:8000
+Access at: <http://localhost:8000>
 
 ## 🌐 API Endpoints
 
 ### REST Endpoints (`/vault/*`)
 
 #### Document Management
+
 - `POST /vault/upload` - Upload encrypted document
 - `GET /vault/document/{document_id}` - Retrieve document (requires auth)
 - `GET /vault/share/{token}` - Verify share link
@@ -66,6 +71,7 @@ Access at: http://localhost:8000
 - `GET /vault/qr/{token}` - Generate QR code for share link
 
 #### Proof Operations
+
 - Proof generation and verification via GraphQL mutations
 
 ### AI Endpoints (`/ai/*`)
@@ -91,9 +97,10 @@ See [AI Endpoints Guide](../docs/ai-endpoints.md) for complete documentation.
 
 See [Monitoring Guide](../docs/monitoring.md) for details.
 
-### Health Checks
+### Health & Readiness
 
 - `GET /health` - Lightweight health check (<0.05s)
+- `GET /health/ready` - Readiness (vkeys present, Neo4j reachable)
 - `GET /` - API information
 
 ### GraphQL Endpoint
@@ -104,22 +111,26 @@ See [Monitoring Guide](../docs/monitoring.md) for details.
 ## 🔒 Security Features
 
 ### Threat Detection
+
 - Automatic IP blocking after suspicious activity
 - XSS/SQL injection detection
 - Path traversal prevention
 - Security event logging
 
 ### Rate Limiting
+
 - Per-endpoint rate limits (20-100 req/min)
 - Configurable via environment variables
 - Automatic throttling
 
 ### Security Headers
+
 - CSP, HSTS, XSS protection
 - Frame options, referrer policy
 - Content type options
 
 ### Input Validation
+
 - Token format validation
 - Document ID validation
 - String sanitization
@@ -128,22 +139,26 @@ See [Monitoring Guide](../docs/monitoring.md) for details.
 ## ⚡ Performance
 
 ### Response Time Targets
+
 - Share bundle: <0.2s (cached)
 - Proof verification: <0.2s (cached vkeys)
 - Health check: <0.05s
 - AI endpoints: <0.3s
 
 ### Caching Strategy
+
 - **Verification Keys**: Cached indefinitely (immutable)
 - **Share Bundles**: 60s TTL
 - **Document Metadata**: 5min TTL
 - **Attestations**: 10min TTL
 
 ### Optimization Features
+
 - Redis caching with in-memory fallback
 - Neo4j connection pooling
 - Response time monitoring
 - Cache hit rate tracking
+- VKey integrity/ETag (sha256) for immutable verification keys
 
 ## 🔧 Configuration
 
@@ -160,6 +175,11 @@ ALLOWED_ORIGINS=http://localhost:5173
 ENABLE_CORS=true
 ENABLE_HSTS=true
 ENABLE_DOCS=true  # Set to false in production
+JWT_SECRET=change-me                   # required for auth
+JWT_ALGO=HS256
+# Optional:
+# JWT_AUDIENCE=your-audience
+# JWT_ISSUER=your-issuer
 
 # Redis (optional)
 REDIS_URL=redis://localhost:6379/0
@@ -169,6 +189,9 @@ AI_API_KEY=your-api-key-here
 
 # Vault Encryption
 VAULT_ENCRYPTION_KEY=<base64-encoded-256-bit-key>
+KMS_KEY_ID=<kms-key-id>                 # recommended: manage keys via KMS/Vault
+KMS_REGION=<region>                     # if using cloud KMS
+ALLOW_GENERATED_VAULT_KEY=false         # set true only for local dev if no key is provided
 
 # Performance
 WORKERS=4  # uvicorn workers
@@ -177,6 +200,7 @@ WORKERS=4  # uvicorn workers
 ### Feature Flags
 
 Disable optional services:
+
 ```bash
 DISABLE_KAFKA=true
 DISABLE_FAISS=true
@@ -185,7 +209,7 @@ DISABLE_FABRIC=true
 
 ## 📁 Project Structure
 
-```
+```text
 backend-python/
 ├── api/                    # FastAPI application
 │   ├── middleware/         # Security, caching, monitoring
@@ -220,6 +244,7 @@ backend-python/
 ## 🔐 Zero-Knowledge Proofs
 
 The backend includes production-ready Groth16 circuits for:
+
 - **Age Verification**: Prove age >= threshold without revealing birthdate
 - **Document Authenticity**: Prove document hash exists in Merkle tree
 
@@ -263,10 +288,12 @@ pytest tests/test_vault.py
 ## 🚀 Production Deployment
 
 For production deployment, see:
+
 - [Production Deployment Guide](PRODUCTION.md)
 - [Main SETUP Guide](../SETUP.md)
 
 Key production considerations:
+
 - Set strong passwords
 - Configure SSL/TLS
 - Enable Redis for distributed caching

@@ -5,10 +5,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:age": "circom circuits/age.circom --r1cs --wasm --sym -o artifacts/age",
-    "build:auth": "circom circuits/authenticity.circom --r1cs --wasm --sym -o artifacts/authenticity",
-    "build:age-level3": "circom circuits/age_level3.circom --r1cs --wasm --sym -o artifacts/age_level3",
-    "build:inequality-level3": "circom circuits/Level3Inequality.circom --r1cs --wasm --sym -o artifacts/level3_inequality",
+    "build:age": "circom circuits/age.circom --r1cs --wasm --sym -o artifacts/age -l node_modules",
+    "build:auth": "circom circuits/authenticity.circom --r1cs --wasm --sym -o artifacts/authenticity -l node_modules",
+    "build:age-level3": "circom circuits/age_level3.circom --r1cs --wasm --sym -o artifacts/age_level3 -l node_modules",
+    "build:inequality-level3": "circom circuits/Level3Inequality.circom --r1cs --wasm --sym -o artifacts/level3_inequality -l node_modules",
     "setup:age": "snarkjs groth16 setup artifacts/age/age.r1cs artifacts/common/pot16_final.ptau artifacts/age/age_0000.zkey",
     "setup:auth": "snarkjs groth16 setup artifacts/authenticity/authenticity.r1cs artifacts/common/pot16_final.ptau artifacts/authenticity/authenticity_0000.zkey",
     "setup:age-level3": "snarkjs groth16 setup artifacts/age_level3/age_level3.r1cs artifacts/common/pot16_final.ptau artifacts/age_level3/age_level3_0000.zkey",
@@ -21,6 +21,7 @@
     "vk:auth": "snarkjs zkey export verificationkey artifacts/authenticity/authenticity_final.zkey artifacts/authenticity/verification_key.json",
     "vk:age-level3": "snarkjs zkey export verificationkey artifacts/age_level3/age_level3_final.zkey artifacts/age_level3/verification_key.json",
     "vk:inequality-level3": "snarkjs zkey export verificationkey artifacts/level3_inequality/Level3Inequality_final.zkey artifacts/level3_inequality/verification_key.json",
+    "hash:vkeys": "python scripts/verify_key_integrity.py generate",
     "verify-circuit:age-level3": "bash scripts/verify_circuit.sh circuits/age_level3.circom",
     "verify-circuit:inequality-level3": "bash scripts/verify_circuit.sh circuits/Level3Inequality.circom",
     "setup-level3": "bash scripts/setup_level3.sh",
@@ -33,6 +34,7 @@
     "test:all": "bash tests/run_tests.sh"
   },
   "dependencies": {
+    "big-integer": "^1.6.52",
     "circomlibjs": "^0.0.8",
     "commander": "^11.0.0",
     "snarkjs": "^0.7.3"
@@ -41,4 +43,3 @@
     "circomlib": "^2.0.5"
   }
 }
-

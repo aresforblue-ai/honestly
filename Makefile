@@ -15,6 +15,7 @@ help:
 	@echo "  make test            - Run all tests"
 	@echo "  make zkp-build       - Build zk circuits, zkeys, and vkeys"
 	@echo "  make zkp-verify      - Verify sample proofs"
+	@echo "  make zkp-rebuild     - Rebuild all zk circuits (including level3) and hashes"
 	@echo "  make perf-k6         - Run k6 load test (set BASE_URL, AUTH)"
 	@echo "  make sbom            - Generate SBOM (trivy if available)"
 	@echo "  make scan            - Dependency/FS scan (trivy/npm audit/pip-audit if available)"
@@ -51,6 +52,17 @@ zkp-verify:
 	node snark-runner.js verify age --proof-file ./samples/age-proof.sample.json && \
 	node snark-runner.js prove authenticity --input-file ./samples/authenticity-input.sample.json > ./samples/authenticity-proof.sample.json && \
 	node snark-runner.js verify authenticity --proof-file ./samples/authenticity-proof.sample.json
+
+zkp-rebuild:
+	cd backend-python/zkp && npm install && \
+	curl -L https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau -o artifacts/common/pot16_final.ptau && \
+	npm run build:age && npm run build:auth && npm run build:age-level3 && npm run build:inequality-level3 && \
+	npm run setup:age && npm run setup:auth && npm run setup:age-level3 && npm run setup:inequality-level3 && \
+	npm run contribute:age && npm run vk:age && \
+	npm run contribute:auth && npm run vk:auth && \
+	npm run contribute:age-level3 && npm run vk:age-level3 && \
+	npm run contribute:inequality-level3 && npm run vk:inequality-level3 && \
+	npm run hash:vkeys
 
 perf-k6:
 	@if ! command -v k6 >/dev/null 2>&1; then echo "k6 not installed. See https://k6.io/docs/get-started/installation/"; exit 1; fi

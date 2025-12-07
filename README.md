@@ -57,6 +57,11 @@ This starts:
 
 See [SETUP.md](SETUP.md) for complete setup instructions.
 
+### ZK Rebuild & Integrity (quick)
+- Rebuild all circuits and hashes: `cd backend-python/zkp && make zkp-rebuild`
+- Integrity check vkeys: `cd backend-python/zkp && python scripts/verify_key_integrity.py`
+- CI: `.github/workflows/zkp.yml` runs rebuild + integrity on circuit changes
+
 ## ✨ Production Features
 
 ### 🔒 Security
@@ -86,9 +91,11 @@ See [SETUP.md](SETUP.md) for complete setup instructions.
 
 ### 🔐 Zero-Knowledge Proofs
 - **Groth16 Circuits**: Age verification and document authenticity
-- **Fast Verification**: <1s verification times
+- **Level 3**: Nullifier/identity-bound circuits (age_level3, Level3Inequality) for stronger replay protection
+- **Fast Verification**: <1s verification times; vkeys served with ETag/sha256
 - **QR-Friendly**: Shareable proof links with QR codes
-- **Production-Ready**: Real zkSNARK circuits (Circom + snarkjs)
+- **Production-Ready**: Circom + snarkjs with integrity hashes (INTEGRITY.json)
+- **Rebuild**: `make zkp-rebuild` (in `backend-python/zkp`) regenerates wasm/zkey/vkey and hashes
 
 ## 📚 Documentation
 
@@ -189,8 +196,12 @@ honestly/
 │   │   ├── ai_routes.py   # AI endpoints
 │   │   └── vault_routes.py # Vault endpoints
 │   ├── vault/             # Vault implementation
-│   ├── zkp/               # ZK-SNARK circuits
+│   ├── zkp/               # ZK-SNARK circuits (age, authenticity, level3), runner, rebuild scripts
 │   └── requirements.txt
+│
+├── conductme/              # Frontend conductor for local AI swarm
+│   ├── core/              # Primary Next.js app (UI, command palette, trust bridge hooks)
+│   └── README.md          # ConductMe overview
 │
 ├── docs/                   # Documentation
 ├── docker-compose.min.yml  # Minimal stack (recommended)

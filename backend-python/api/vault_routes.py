@@ -6,7 +6,8 @@ import base64
 import secrets
 import time
 from typing import Optional
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, status
+import logging
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, status, Depends
 from fastapi.responses import JSONResponse
 from py2neo import Graph
 
@@ -19,58 +20,54 @@ from api.qr_generator import generate_qr_response
 from api.cache import cached, get as cache_get, set as cache_set
 from api.monitoring import record_metric
 from api.app import get_vkey_hash, hmac_sign
+from api.auth import get_current_user
 from datetime import datetime
 
 # Initialize services
 NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
 NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
 NEO4J_PASS = os.getenv('NEO4J_PASS', 'test')
+PUBLIC_RATE_LIMIT_WINDOW = int(os.getenv("PUBLIC_RATE_LIMIT_WINDOW", "60"))
+PUBLIC_RATE_LIMIT_MAX = int(os.getenv("PUBLIC_RATE_LIMIT_MAX", "20"))
 
 graph = Graph(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
 vault_storage = VaultStorage()
 share_link_service = ShareLinkService(graph)
 timeline_service = TimelineService(graph)
 fabric_client = FabricClient()
+logger = logging.getLogger("security")
 
 # Simple in-memory rate limiter for public endpoints (best-effort, per-IP)
 _rate_bucket: dict[str, dict] = {}
-_RATE_LIMIT_WINDOW = 60  # seconds
-_RATE_LIMIT_MAX = 20     # requests per window
 
 
 def _check_rate_limit(key: str):
     now = time.time()
     bucket = _rate_bucket.get(key, {"count": 0, "window_start": now})
-    if now - bucket["window_start"] > _RATE_LIMIT_WINDOW:
+    if now - bucket["window_start"] > PUBLIC_RATE_LIMIT_WINDOW:
         bucket = {"count": 0, "window_start": now}
     bucket["count"] += 1
     _rate_bucket[key] = bucket
-    if bucket["count"] > _RATE_LIMIT_MAX:
+    if bucket["count"] > PUBLIC_RATE_LIMIT_MAX:
+        logger.warning("rate_limit_exceeded", extra={"key": key, "count": bucket["count"]})
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded")
 
 router = APIRouter(prefix="/vault", tags=["vault"])
-
-
-# Production authentication
-def get_user_id() -> str:
-    """Get current user ID (placeholder until JWT/OIDC wired)."""
-    return os.getenv('MOCK_USER_ID', 'test_user_1')
 
 
 @router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
     document_type: str = Form(...),
-    user_id: Optional[str] = Form(None),
-    metadata: Optional[str] = Form(None)
+    metadata: Optional[str] = Form(None),
+    user=Depends(get_current_user),
 ):
     """
     Upload a document to the vault.
     
     Returns document ID and hash.
     """
-    # Get user ID
-    uid = user_id or get_user_id()
+    uid = user["user_id"]
     
     # Read file data
     file_data = await file.read()
@@ -176,12 +173,12 @@ async def upload_document(
 
 
 @router.get("/document/{document_id}")
-async def get_document(document_id: str, user_id: Optional[str] = None):
+async def get_document(document_id: str, user=Depends(get_current_user)):
     """
     Retrieve a document (decrypted).
     Requires authentication.
     """
-    uid = user_id or get_user_id()
+    uid = user["user_id"]
     
     # Verify ownership
     query = """
@@ -221,12 +218,12 @@ async def verify_share_link(token: str, request: Request):
     proof_link = share_link_service.validate_token(token)
     
     if not proof_link:
-        raise HTTPException(status_code=404, detail="Share link not found or expired")
+        raise HTTPException(status_code=404, detail="Not found")
     
     # Get document metadata
     doc_meta = vault_storage.get_document_metadata(proof_link.document_id)
     if not doc_meta:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=404, detail="Not found")
     
     # Get attestation
     attestation = fabric_client.query_attestation(proof_link.document_id)
@@ -299,12 +296,12 @@ async def get_share_bundle(token: str, request: Request):
 
     if not proof_link:
         record_metric("share_bundle", time.time() - start_time, success=False)
-        raise HTTPException(status_code=404, detail="Share link not found or expired")
+        raise HTTPException(status_code=404, detail="Not found")
 
     doc_meta = vault_storage.get_document_metadata(proof_link.document_id)
     if not doc_meta:
         record_metric("share_bundle", time.time() - start_time, success=False)
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=404, detail="Not found")
 
     # Only query attestation if needed (can be slow)
     attestation = None

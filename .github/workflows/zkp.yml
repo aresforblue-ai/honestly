@@ -1,0 +1,91 @@
+name: ZK Circuit Rebuild and Verification
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend-python/zkp/circuits/**'
+      - 'backend-python/zkp/scripts/**'
+      - 'backend-python/zkp/Makefile'
+      - 'backend-python/zkp/package.json'
+      - 'backend-python/zkp/poseidon-hash.js'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend-python/zkp/circuits/**'
+      - 'backend-python/zkp/scripts/**'
+      - 'backend-python/zkp/Makefile'
+      - 'backend-python/zkp/package.json'
+      - 'backend-python/zkp/poseidon-hash.js'
+
+jobs:
+  zkp-rebuild:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Cache node_modules for zkp package
+      - name: Cache npm dependencies
+        id: cache-npm
+        uses: actions/cache@v4
+        with:
+          path: backend-python/zkp/node_modules
+          key: ${{ runner.os }}-zkp-node-${{ hashFiles('backend-python/zkp/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-zkp-node-
+
+      # Cache Powers of Tau file
+      - name: Prepare ptau path
+        run: mkdir -p backend-python/zkp/artifacts/common
+
+      - name: Cache ptau
+        id: cache-ptau
+        uses: actions/cache@v4
+        with:
+          path: backend-python/zkp/artifacts/common/pot16_final.ptau
+          key: ${{ runner.os }}-ptau-v16
+          restore-keys: |
+            ${{ runner.os }}-ptau-
+
+      - name: Install dependencies
+        if: steps.cache-npm.outputs.cache-hit != 'true'
+        run: |
+          cd backend-python/zkp
+          npm install
+
+      # Download ptau if cache miss
+      - name: Download ptau if missing
+        run: |
+          if [ ! -f backend-python/zkp/artifacts/common/pot16_final.ptau ]; then
+            curl -L https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau -o backend-python/zkp/artifacts/common/pot16_final.ptau
+          fi
+
+      - name: Rebuild all circuits
+        run: |
+          cd backend-python/zkp
+          make zkp-rebuild
+
+      - name: Verify vkey integrity
+        run: |
+          cd backend-python/zkp
+          python scripts/verify_key_integrity.py
+
+      - name: Run zk property tests
+        run: |
+          cd backend-python
+          pytest tests/test_zk_properties.py -v
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zkp-artifacts
+          path: backend-python/zkp/artifacts/
+          retention-days: 7
+

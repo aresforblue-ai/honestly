@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from ariadne import MutationType, QueryType
 from py2neo import Graph
+from fastapi import HTTPException
 
 from vault.storage import VaultStorage
 from vault.models import DocumentType, AccessLevel, EventType
@@ -32,11 +33,18 @@ query = QueryType()
 mutation = MutationType()
 
 
+def _require_user(info) -> str:
+    """Require authenticated user from GraphQL context."""
+    user = info.context.get("user")
+    if not user or "user_id" not in user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return user["user_id"]
+
+
 @query.field("myDocuments")
 def resolve_my_documents(_, info):
     """Get current user's documents."""
-    # TODO: Get user_id from authentication context
-    user_id = info.context.get('user_id', 'test_user_1')  # Mock for MVP
+    user_id = _require_user(info)
     
     query_cypher = """
     MATCH (u:User {id: $user_id})-[:OWNS]->(d:Document)
@@ -69,15 +77,16 @@ def resolve_my_documents(_, info):
 @query.field("document")
 def resolve_document(_, info, id):
     """Get a specific document by ID."""
+    user_id = _require_user(info)
     query_cypher = """
-    MATCH (d:Document {id: $id})
+    MATCH (u:User {id: $user_id})-[:OWNS]->(d:Document {id: $id})
     RETURN d
     LIMIT 1
     """
     
-    results = graph.run(query_cypher, {"id": id}).data()
+    results = graph.run(query_cypher, {"id": id, "user_id": user_id}).data()
     if not results:
-        return None
+        raise HTTPException(status_code=404, detail="Document not found or access denied")
     
     doc_node = results[0]['d']
     doc_dict = dict(doc_node)
@@ -99,7 +108,7 @@ def resolve_document(_, info, id):
 @query.field("myTimeline")
 def resolve_my_timeline(_, info, limit=50):
     """Get current user's timeline."""
-    user_id = info.context.get('user_id', 'test_user_1')  # Mock for MVP
+    user_id = _require_user(info)
     
     events = timeline_service.get_timeline(user_id=user_id, limit=limit)
     
@@ -171,7 +180,7 @@ def resolve_upload_document(
     """Upload a document (requires file upload via REST endpoint)."""
     # This mutation is a placeholder - actual file upload happens via REST
     # In a real implementation, file data would come from multipart form
-    user_id = info.context.get('user_id', 'test_user_1')  # Mock for MVP
+    user_id = _require_user(info)
     
     # For MVP, return a placeholder
     # Real implementation would handle file upload here
@@ -200,12 +209,14 @@ def resolve_generate_proof(
     """Generate a zero-knowledge proof."""
     import json
     
-    user_id = info.context.get('user_id', 'test_user_1')  # Mock for MVP
+    user_id = _require_user(info)
     
     # Get document metadata
     doc_meta = vault_storage.get_document_metadata(documentId)
     if not doc_meta:
         raise ValueError(f"Document {documentId} not found")
+    if doc_meta.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Access denied for document")
     
     # Parse proof parameters
     params = {}
@@ -274,7 +285,7 @@ def resolve_create_share_link(
     maxAccesses=None
 ):
     """Create a shareable proof link."""
-    user_id = info.context.get('user_id', 'test_user_1')  # Mock for MVP
+    user_id = _require_user(info)
     
     # Parse expiration
     expires_dt = None
@@ -284,6 +295,11 @@ def resolve_create_share_link(
     # Parse access level
     access_level = AccessLevel[accessLevel]
     
+    # Verify document ownership
+    meta = vault_storage.get_document_metadata(documentId)
+    if not meta or meta.get("user_id") != user_id:
+        raise HTTPException(status_code=404, detail="Document not found or access denied")
+
     # Create share link
     proof_link = share_link_service.create_share_link(
         document_id=documentId,

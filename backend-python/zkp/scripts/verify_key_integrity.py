@@ -46,35 +46,37 @@ def verify_integrity(circuit: str, artifacts_dir: Path) -> bool:
         print(f"✅ Generated hash: {computed_hash}")
         return True
 
-def generate_hashes(artifacts_dir: Path):
+def generate_hashes(artifacts_dir: Path, circuits):
     """Generate integrity hashes for all verification keys."""
-    circuits = ["age", "authenticity"]
-    
+    integrity = {}
     for circuit in circuits:
         vkey_path = artifacts_dir / circuit / "verification_key.json"
         hash_path = artifacts_dir / circuit / "verification_key.sha256"
-        
         if vkey_path.exists():
             hash_value = compute_vkey_hash(vkey_path)
+            integrity[circuit] = hash_value
             with open(hash_path, "w") as f:
                 f.write(hash_value)
             print(f"✅ Generated hash for {circuit}: {hash_value[:16]}...")
         else:
             print(f"⚠️  Verification key not found for {circuit}")
+    if integrity:
+        with open(artifacts_dir / "INTEGRITY.json", "w") as f:
+            json.dump(integrity, f, indent=2)
+        print("✅ Wrote INTEGRITY.json")
 
 if __name__ == "__main__":
     import sys
     
     artifacts_dir = Path(__file__).parent.parent / "artifacts"
-    
+    circuits = ["age", "authenticity", "age_level3", "level3_inequality"]
+
     if len(sys.argv) > 1 and sys.argv[1] == "generate":
-        generate_hashes(artifacts_dir)
+        generate_hashes(artifacts_dir, circuits)
     else:
-        circuits = ["age", "authenticity"]
         all_passed = True
         for circuit in circuits:
             if not verify_integrity(circuit, artifacts_dir):
                 all_passed = False
-        
         sys.exit(0 if all_passed else 1)
 

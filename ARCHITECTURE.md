@@ -8,7 +8,24 @@ This document describes the complete architecture of the Honestly Truth Engine p
 ┌─────────────────────────────────────────────────────────────┐
 │                         USER LAYER                          │
 │  ┌────────────────┐         ┌─────────────────────┐         │
-│  │   Web Browser  │────────▶│  Mobile App (Future)│         │
+│  │   Web Browser  │────────▶│  Mobile App (Future)│         │lanned execution (in order):
+1) Backend security
+Add JWT/OIDC auth for vault routes (replace mock user), enforce on upload/document/share creation.
+KMS/Vault key loader for VAULT_ENCRYPTION_KEY with env fallback; fail fast if missing.
+Harden rate limits and sanitized errors on public GETs; structured security logs.
+2) ZK alignment
+Rebuild all circuits (age/auth/level3), refresh INTEGRITY.json and vkey hashes.
+Add circuit property tests for level3 (nullifier/identity binding, Merkle/path validity), run in CI.
+3) Frontend (ConductMe)
+Trust Bridge client: Semaphore identity create/load, proof gen/verify stub.
+EIP-712 action signing wired with ethers; optional wallet connect.
+Workflow builder already scaffolded; keep React Flow + Zustand, add save/load stubs.
+Local LLM proxy API route + health polling hook; env-configurable endpoints.
+4) CI/CD
+Fix Codacy (install curl or disable MCP hook); ensure CI runs make zkp-rebuild, integrity check, circuit tests, and uploads artifacts.
+5) Docs
+Update main/architecture/backend README to reflect auth/KMS, vkey gating, LLM proxy, trust bridge, signing.
+Confirm if you want me to start with step 1 (backend auth/KMS) and step 2 (ZK rebuild/tests) now; I’ll then move to the frontend proxy/trust/signing, followed by CI fixes and doc updates
 │  └────────────────┘         └─────────────────────┘         │
 └────────────┬────────────────────────────────────────────────┘
              │
@@ -39,7 +56,7 @@ This document describes the complete architecture of the Honestly Truth Engine p
 │                                 │ └────────────────────┘ │   │
 │                                 │                         │   │
 │                                 │ - Vault Management      │   │
-│                                 │ - ZK Proofs (Groth16)   │   │
+│                                 │ - ZK Proofs (Groth16: age, authenticity, level3 nullifier-binding) │   │
 │                                 │ - AI Endpoints (/ai/*) │   │
 │                                 │ - Monitoring (/monitoring/*)│
 │                                 │ - Kafka Integration     │   │
@@ -58,7 +75,7 @@ This document describes the complete architecture of the Honestly Truth Engine p
 │  ┌──────────────────┐  ┌──────────────────────────────┐  │
 │  │  Redis Cache     │  │  Monitoring & Metrics        │  │
 │  │  (Optional)      │  │  - Health Checks             │  │
-│  │  - VKeys         │  │  - Performance Metrics       │  │
+│  │  - VKeys (ETag/sha256) │  │  - Performance Metrics       │  │
 │  │  - Share Bundles │  │  - Security Events           │  │
 │  │  - Metadata      │  │  - System Resources          │  │
 │  └──────────────────┘  └──────────────────────────────┘  │

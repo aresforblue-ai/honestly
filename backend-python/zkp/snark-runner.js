@@ -20,6 +20,13 @@ const circuits = {
     vkey: path.join(__dirname, "artifacts", "age", "verification_key.json"),
     publicSignals: ["minAgeOut", "referenceTsOut", "documentHashOut", "commitment", "nullifier"],
   },
+  age_level3: {
+    name: "age_level3",
+    wasm: path.join(__dirname, "artifacts", "age_level3", "age_level3_js", "age_level3.wasm"),
+    zkey: path.join(__dirname, "artifacts", "age_level3", "age_level3_final.zkey"),
+    vkey: path.join(__dirname, "artifacts", "age_level3", "verification_key.json"),
+    publicSignals: ["referenceTs", "minAge", "userID", "documentHash", "nullifier", "verified"],
+  },
   authenticity: {
     name: "authenticity",
     wasm: path.join(__dirname, "artifacts", "authenticity", "authenticity_js", "authenticity.wasm"),
@@ -55,7 +62,7 @@ const program = new Command();
 
 program
   .command("prove")
-  .argument("<circuit>", "circuit name (age|authenticity)")
+  .argument("<circuit>", "circuit name (age|age_level3|authenticity)")
   .option("--input-file <path>", "JSON input file (defaults to stdin)")
   .action(async (circuitName, options) => {
     const circuit = circuits[circuitName];
@@ -88,7 +95,7 @@ program
 
 program
   .command("verify")
-  .argument("<circuit>", "circuit name (age|authenticity)")
+  .argument("<circuit>", "circuit name (age|age_level3|authenticity)")
   .option("--proof-file <path>", "proof bundle file (defaults to stdin)")
   .action(async (circuitName, options) => {
     const circuit = circuits[circuitName];

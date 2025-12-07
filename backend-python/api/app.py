@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import base64
 import time
+import logging
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +19,7 @@ from vector_index.faiss_index import FaissIndex
 # Import vault resolvers and routes
 from api.vault_resolvers import query as vault_query, mutation as vault_mutation
 from api.vault_routes import router as vault_router
+from api.auth import decode_authorization_header
 
 # Import Prometheus metrics
 try:
@@ -42,6 +44,7 @@ RATE_LIMIT_WINDOW = int(os.getenv('RATE_LIMIT_WINDOW', '60'))
 RATE_LIMIT_MAX = int(os.getenv('RATE_LIMIT_MAX', '60'))  # per window per IP for public/GraphQL
 _VKEY_HASHES = {}  # circuit -> sha256 hex
 _rate_bucket: dict[str, dict] = {}
+logger = logging.getLogger("security")
 
 graph = Graph(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
 embed_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -192,6 +195,18 @@ def vkeys_ready() -> bool:
     return all(_VKEY_HASHES.get(c) for c in ("age", "authenticity"))
 
 
+def _log_security(event: str, request: Request | None = None, **kwargs):
+    """Lightweight structured security logging."""
+    payload = {"event": event, **kwargs}
+    if request:
+        payload["path"] = request.url.path
+        payload["client"] = request.client.host if request.client else None
+    try:
+        logger.warning(json.dumps(payload))
+    except Exception:
+        logger.warning("%s %s", event, payload)
+
+
 def _rate_check(key: str):
     if not RATE_LIMIT_ENABLED:
         return
@@ -202,6 +217,7 @@ def _rate_check(key: str):
     bucket["count"] += 1
     _rate_bucket[key] = bucket
     if bucket["count"] > RATE_LIMIT_MAX:
+        _log_security("rate_limit_exceeded", key=key, count=bucket["count"])
         raise HTTPException(status_code=429, detail="Rate limit exceeded")
 
 
@@ -233,8 +249,21 @@ def _ensure_vkeys_loaded():
     if not vkeys_ready():
         raise RuntimeError("Verification keys are not loaded; startup gating failed.")
 
-# Mount GraphQL endpoint
-app.mount("/graphql", GraphQL(schema, debug=True))
+async def graphql_context_value(request: Request):
+    """Attach authenticated user (if provided) to GraphQL context."""
+    auth_header = request.headers.get("authorization")
+    user = None
+    if auth_header:
+        user = decode_authorization_header(auth_header)
+    return {
+        "request": request,
+        "user": user,
+        "user_id": user["user_id"] if user else None,
+    }
+
+
+# Mount GraphQL endpoint with context-aware auth
+app.mount("/graphql", GraphQL(schema, debug=False, context_value=graphql_context_value))
 
 # Mount vault REST routes
 app.include_router(vault_router)
