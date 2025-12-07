@@ -29,6 +29,13 @@ Honestly is a comprehensive **privacy-preserving identity platform** that enable
 
 ## ✨ What's New
 
+### 🤖 AI Agent Identity Protocol (AAIP) — NEW
+- **Verifiable AI Identities** — First-of-its-kind protocol for AI agent authentication
+- **Real Groth16 ZK Proofs** — Reputation thresholds proven without revealing scores
+- **Nullifier Tracking** — Replay attack prevention with Redis persistence
+- **ECDSA Signatures** — Cryptographic authentication for agents
+- **W3C VC Compatible** — DIDs in format `did:honestly:agent:{id}`
+
 ### 🎨 World-Class UI
 - **Stunning Frontend** — Glassmorphism, animations, and premium design patterns
 - **Responsive Design** — Beautiful on all devices
@@ -77,6 +84,78 @@ Honestly is a comprehensive **privacy-preserving identity platform** that enable
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 🤖 AI Agent Identity Protocol (AAIP)
+
+AAIP enables **verifiable AI agent identities** with real zero-knowledge proofs. This is the missing link between AI orchestration and cryptographic verification.
+
+### Key Features
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **Real ZK Proofs** | ✅ | Groth16 via Level3Inequality circuit |
+| **Nullifier Tracking** | ✅ | Prevents replay attacks |
+| **ECDSA Signatures** | ✅ | Agent authentication |
+| **Redis Persistence** | ✅ | Production-ready storage |
+| **W3C VC Compatible** | ✅ | `did:honestly:agent:{id}` |
+| **Model Fingerprinting** | ✅ | Deterministic model hashes |
+
+### Usage
+
+```python
+from identity import register_ai_agent, get_agent_reputation
+
+# Register an AI agent with verifiable identity
+agent = register_ai_agent(
+    name="claude-3-opus",
+    operator_id="anthropic",
+    operator_name="Anthropic",
+    model_family="transformer",
+    capabilities=["text_generation", "reasoning", "code_generation"],
+    constraints=["audit_logged", "human_approval_required"],
+    public_key="-----BEGIN PUBLIC KEY-----\n...",
+)
+
+# Generate ZK proof that reputation > threshold
+rep = get_agent_reputation(agent["agent_id"], threshold=40)
+
+# Returns real Groth16 proof + nullifier
+print(rep["proof"])         # Groth16 proof object
+print(rep["nullifier"])     # Unique, prevents replay
+print(rep["zk_verified"])   # True = cryptographically verified
+```
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      ConductMe Core                         │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │   Claude    │  │   Gemini    │  │   Local LLM │         │
+│  │  Agent ID   │  │  Agent ID   │  │  Agent ID   │         │
+│  │  ┌───────┐  │  │  ┌───────┐  │  │  ┌───────┐  │         │
+│  │  │Nullif.│  │  │  │Nullif.│  │  │  │Nullif.│  │         │
+│  │  └───────┘  │  │  └───────┘  │  │  └───────┘  │         │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘         │
+│         │                │                │                 │
+│         └────────────────┼────────────────┘                 │
+│                          ▼                                  │
+│            ┌───────────────────────┐                        │
+│            │   AAIP ZK Integration │                        │
+│            │   (Level3Inequality)  │                        │
+│            └───────────┬───────────┘                        │
+│                        ▼                                    │
+│            ┌───────────────────────┐                        │
+│            │    Groth16 Prover     │                        │
+│            │    (snark-runner.js)  │                        │
+│            └───────────────────────┘                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+See [Identity Module](backend-python/identity/) for full documentation.
 
 ---
 

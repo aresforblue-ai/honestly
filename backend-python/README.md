@@ -232,10 +232,20 @@ backend-python/
 │   ├── share_links.py     # Share link management
 │   └── models.py          # Data models
 │
+├── identity/               # Identity infrastructure (AAIP)
+│   ├── ai_agent_protocol.py   # AI Agent Identity Protocol
+│   ├── zkp_integration.py     # ZK proof integration
+│   ├── verifiable_credentials.py  # W3C VCs
+│   ├── social_recovery.py     # Shamir's Secret Sharing
+│   └── cross_chain_bridge.py  # Cross-chain identity
+│
 ├── zkp/                    # Zero-knowledge proofs
 │   ├── circuits/          # Circom circuits
+│   │   ├── Level3Inequality.circom  # Reputation proofs
+│   │   ├── agent_capability.circom  # Capability proofs
+│   │   └── agent_reputation.circom  # Agent-specific proofs
 │   ├── artifacts/         # Compiled artifacts
-│   └── snark-runner.js    # Proof runner
+│   └── snark-runner.js    # Proof runner (incl. level3_inequality)
 │
 ├── ingestion/              # Kafka integration (optional)
 ├── blockchain/            # Fabric integration (optional)
@@ -246,6 +256,62 @@ backend-python/
 └── README.md             # This file
 ```
 
+## 🤖 AI Agent Identity Protocol (AAIP)
+
+The backend includes a complete AI agent identity infrastructure:
+
+### Features
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **Agent Registration** | ✅ | Register AI agents with verifiable identities |
+| **Real ZK Proofs** | ✅ | Groth16 reputation proofs via `level3_inequality` |
+| **Nullifier Tracking** | ✅ | Replay attack prevention with Redis persistence |
+| **ECDSA Signatures** | ✅ | Agent authentication with challenge-response |
+| **Model Fingerprinting** | ✅ | Deterministic, reproducible model hashes |
+| **W3C VC Compatible** | ✅ | DIDs: `did:honestly:agent:{id}` |
+
+### Usage
+
+```python
+from identity import (
+    register_ai_agent,
+    get_agent_reputation,
+    verify_reputation_proof,
+    AgentAuthenticator,
+)
+
+# Register an AI agent
+agent = register_ai_agent(
+    name="claude-3-opus",
+    operator_id="anthropic",
+    operator_name="Anthropic",
+    model_family="transformer",
+    capabilities=["text_generation", "reasoning"],
+    constraints=["audit_logged"],
+    public_key="-----BEGIN PUBLIC KEY-----\n...",
+)
+
+# Get reputation with ZK proof
+rep = get_agent_reputation(agent["agent_id"], threshold=40)
+
+# Real Groth16 proof + nullifier
+print(rep["proof"])        # Groth16 proof
+print(rep["nullifier"])    # Prevents replay attacks
+print(rep["zk_verified"])  # True if circuit verified
+```
+
+### API Endpoints
+
+See `/api/identity_routes.py` for REST endpoints:
+
+- `POST /identity/agent/register` - Register new agent
+- `GET /identity/agent/{id}` - Get agent info
+- `POST /identity/agent/{id}/reputation` - Get reputation with ZK proof
+- `POST /identity/agent/authenticate` - Challenge-response auth
+
+---
+
 ## 🔐 Zero-Knowledge Proofs
 
 The backend includes production-ready Groth16 circuits for:
@@ -253,6 +319,7 @@ The backend includes production-ready Groth16 circuits for:
 - **Age Verification** (`age`): Prove age >= threshold without revealing birthdate
 - **Document Authenticity** (`authenticity`): Prove document hash exists in Merkle tree
 - **Level 3 / Nullifier-Binding** (`age_level3`, `Level3Inequality`): Identity-bound variants to prevent replay/transfer
+- **Agent Reputation** (`level3_inequality`): Prove agent reputation >= threshold without revealing score
 
 Rebuild & integrity:
 

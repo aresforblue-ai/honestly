@@ -111,3 +111,4 @@ template AgentReputation(n) {
 // Instantiate with 7-bit range (covers 0-127, sufficient for 0-100 reputation)
 component main {public [threshold, agentDIDHash, timestamp]} = AgentReputation(7);
 
+

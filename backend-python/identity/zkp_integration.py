@@ -482,3 +482,4 @@ def verify_agent_reputation_proof(
         "nullifier_tracked": check_replay and is_valid,
     }
 
+

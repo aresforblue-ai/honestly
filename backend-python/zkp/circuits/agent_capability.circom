@@ -113,3 +113,4 @@ template AgentCapability() {
 
 component main {public [capabilityHash, agentCommitment, timestamp]} = AgentCapability();
 
+
