@@ -34,6 +34,14 @@ const circuits = {
     vkey: path.join(__dirname, "artifacts", "authenticity", "verification_key.json"),
     publicSignals: ["rootOut", "leafOut", "epochOut", "nullifier"],
   },
+  // Level 3 Inequality - for reputation/threshold proofs
+  level3_inequality: {
+    name: "level3_inequality",
+    wasm: path.join(__dirname, "artifacts", "level3_inequality", "Level3Inequality_js", "Level3Inequality.wasm"),
+    zkey: path.join(__dirname, "artifacts", "level3_inequality", "Level3Inequality_final.zkey"),
+    vkey: path.join(__dirname, "artifacts", "level3_inequality", "verification_key.json"),
+    publicSignals: ["threshold", "senderID", "nullifier", "out"],
+  },
 };
 
 async function readJsonMaybe(filePath) {

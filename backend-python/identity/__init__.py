@@ -32,6 +32,17 @@ from .ai_agent_protocol import (
     verify_agent_capability,
     get_agent_reputation,
     get_registry,
+    reset_registry,
+    verify_reputation_proof,
+    compute_model_fingerprint,
+)
+
+from .zkp_integration import (
+    AAIPZKIntegration,
+    ZKProofResult,
+    get_zkp_integration,
+    prove_agent_reputation_zk,
+    verify_agent_reputation_proof,
 )
 
 from .verifiable_credentials import (
@@ -80,6 +91,16 @@ __all__ = [
     "verify_agent_capability",
     "get_agent_reputation",
     "get_registry",
+    "reset_registry",
+    "verify_reputation_proof",
+    "compute_model_fingerprint",
+    
+    # ZK Integration
+    "AAIPZKIntegration",
+    "ZKProofResult",
+    "get_zkp_integration",
+    "prove_agent_reputation_zk",
+    "verify_agent_reputation_proof",
     
     # Verifiable Credentials
     "VerifiableCredential",
