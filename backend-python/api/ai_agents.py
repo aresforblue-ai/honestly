@@ -91,6 +91,58 @@ def verify_ai_request(request: AIAgentRequest, signature: Optional[str] = None) 
     return verify_ai_agent_signature(payload_str, signature, AI_AGENT_SECRET)
 
 
+def lookup_document_by_hash(document_hash: str) -> Optional[Dict[str, Any]]:
+    """
+    Reverse lookup a document by its hash.
+    
+    Queries Neo4j for documents with matching hash.
+    
+    Args:
+        document_hash: The document hash to look up
+        
+    Returns:
+        Document metadata dict or None if not found
+    """
+    try:
+        # Sanitize input
+        clean_hash = sanitize_input(document_hash)
+        
+        # Query Neo4j for document with this hash
+        query = """
+        MATCH (d:Document {hash: $hash})
+        RETURN d.id as id, d.hash as hash, d.document_type as document_type,
+               d.created_at as created_at, d.owner_id as owner_id
+        LIMIT 1
+        """
+        
+        results = graph.run(query, {"hash": clean_hash}).data()
+        
+        if results:
+            return results[0]
+        
+        # Also check vault storage for local documents
+        # This handles documents not yet synced to Neo4j
+        all_docs = vault_storage.list_documents() if hasattr(vault_storage, 'list_documents') else []
+        for doc_id in all_docs:
+            meta = vault_storage.get_document_metadata(doc_id)
+            if meta and meta.get('hash') == clean_hash:
+                return {
+                    'id': doc_id,
+                    'hash': meta.get('hash'),
+                    'document_type': meta.get('document_type'),
+                    'created_at': meta.get('created_at'),
+                    'owner_id': meta.get('owner_id'),
+                }
+        
+        return None
+        
+    except Exception as e:
+        # Log error but don't expose details
+        import logging
+        logging.getLogger('api.ai_agents').error(f"Hash lookup error: {e}")
+        return None
+
+
 @router.post("/verify-proof", response_model=Dict[str, Any])
 @rate_limit(calls=AI_AGENT_RATE_LIMIT, period=60)
 async def ai_verify_proof(
@@ -171,8 +223,18 @@ async def ai_get_document_hash(
                 'created_at': meta.get('created_at')
             }
         elif request.document_hash:
-            # Query by hash (if you have reverse lookup)
-            raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Hash lookup not implemented")
+            # Reverse lookup by document hash via Neo4j
+            doc = lookup_document_by_hash(request.document_hash)
+            if not doc:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document with hash not found")
+            
+            return {
+                'document_id': doc.get('id'),
+                'hash': request.document_hash,
+                'document_type': doc.get('document_type'),
+                'created_at': doc.get('created_at'),
+                'owner_id': doc.get('owner_id'),
+            }
         else:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="document_id or document_hash required")
     

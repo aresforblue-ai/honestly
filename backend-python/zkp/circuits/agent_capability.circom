@@ -50,12 +50,14 @@ template AgentCapability() {
     // 4. AGENT IDENTITY VERIFICATION
     // ---------------------------------------------------------
     // Verify the agent commitment matches the private agent ID
+    // This prevents agents from claiming false capabilities
     component agentHasher = Poseidon(2);
     agentHasher.inputs[0] <== agentID;
     agentHasher.inputs[1] <== salt;
     
-    // The commitment should match (this is checked externally for now)
-    // In production, would constrain: agentHasher.out === agentCommitment
+    // CRITICAL: Enforce agent identity binding
+    // Without this constraint, any agent could claim any capability
+    agentHasher.out === agentCommitment;
     
     // ---------------------------------------------------------
     // 5. CAPABILITY LOOKUP
