@@ -1,4 +1,5 @@
 # Honestly - Truth Engine & Personal Proof Vault
+# Last updated: 2025-12-06
 
 A production-ready blockchain-verified identity and credential verification system with zero-knowledge proofs, AI integration, and enterprise-grade security.
 
@@ -13,7 +14,7 @@ Honestly is a comprehensive platform for:
 
 ## 🏗️ Architecture
 
-The Honestly platform consists of three main components:
+The Honestly platform consists of four main components:
 
 ### 1. **Frontend Application** (`frontend-app/`)
 - React + Vite application
@@ -22,13 +23,20 @@ The Honestly platform consists of three main components:
 - Real-time proof verification UI
 - QR code scanning and verification
 
-### 2. **GraphQL Backend** (`backend-graphql/`)
+### 2. **ConductMe Core** (`conductme/core/`)
+- Next.js control plane for local AI orchestration
+- Trust Bridge (Semaphore-based identity and proof hand-off)
+- Node-based workflow builder (React Flow + Zustand)
+- EIP-712 signing hooks (ethers) and wallet-connect placeholder
+- LLM proxy route for local models (e.g., Ollama)
+
+### 3. **GraphQL Backend** (`backend-graphql/`)
 - Node.js + Apollo Server
 - App verification and scoring engine
 - Claims, evidence, and verdict management
 - WhistlerScore calculation
 
-### 3. **Python Backend** (`backend-python/`)
+### 4. **Python Backend** (`backend-python/`)
 - FastAPI REST API with production-grade security
 - Neo4j graph database
 - Zero-knowledge proof generation (Groth16)
@@ -38,6 +46,7 @@ The Honestly platform consists of three main components:
 - Kafka event streaming (optional)
 - FAISS vector search (optional)
 - Hyperledger Fabric blockchain (optional)
+- VKey caching with ETag/sha256 and integrity gating
 
 ## 🚀 Quick Start
 
@@ -52,6 +61,7 @@ This starts:
 - **API**: http://localhost:8000 (REST/GraphQL)
 - **Frontend**: http://localhost:5173
 - **Neo4j**: http://localhost:7474 (bolt://localhost:7687)
+- **ConductMe Core**: http://localhost:3000 (local AI orchestrator)
 
 ### Full Stack Setup
 
@@ -61,19 +71,23 @@ See [SETUP.md](SETUP.md) for complete setup instructions.
 - Rebuild all circuits and hashes: `cd backend-python/zkp && make zkp-rebuild`
 - Integrity check vkeys: `cd backend-python/zkp && python scripts/verify_key_integrity.py`
 - CI: `.github/workflows/zkp.yml` runs rebuild + integrity on circuit changes
+- Heavy circuits (level3) on local/dev: set `NODE_OPTIONS="--max-old-space-size=8192"` before `npm run build:*` / proving to avoid WASM heap OOM (especially on Windows)
 
 ## ✨ Production Features
 
 ### 🔒 Security
-- **Security Middleware**: Automatic threat detection, IP blocking, rate limiting
+- **JWT/OIDC**: OIDC JWKS verification (RS/ES) with HS256 fallback
+- **Vault Keys**: Centralized loader (KMS hook/env/file) with fail-fast startup
+- **Security Middleware**: Threat detection, IP blocking, rate limiting
 - **Security Headers**: CSP, HSTS, XSS protection, frame options
 - **Input Validation**: XSS/SQL injection detection, token validation
-- **Rate Limiting**: Per-endpoint limits (20-100 req/min)
+- **Rate Limiting**: Per-endpoint limits (20-100 req/min), share bundling guarded
 - **Threat Detection**: Automatic IP blocking after suspicious activity
 
 ### ⚡ Performance
 - **Sub-0.2s Response Times**: Optimized endpoints with caching
 - **Redis Caching**: Distributed caching with in-memory fallback
+- **VKey Caching**: ETag + sha256 integrity gating for zk verification keys
 - **Connection Pooling**: Optimized database connections
 - **Performance Monitoring**: P95/P99 metrics, response time tracking
 
@@ -82,6 +96,7 @@ See [SETUP.md](SETUP.md) for complete setup instructions.
 - **Standardized Responses**: Consistent `{success, data, error, metadata}` format
 - **Batch Operations**: Verify up to 100 proofs in one request
 - **API Key Authentication**: Secure access control
+- **ConductMe Bridge**: Trust Bridge + EIP-712 signing + local LLM proxy (via `conductme/core`)
 
 ### 📊 Monitoring
 - **Health Checks**: `/health` (lightweight), `/monitoring/health` (comprehensive)
@@ -90,11 +105,11 @@ See [SETUP.md](SETUP.md) for complete setup instructions.
 - **System Monitoring**: CPU, memory, disk usage tracking
 
 ### 🔐 Zero-Knowledge Proofs
-- **Groth16 Circuits**: Age verification and document authenticity
-- **Level 3**: Nullifier/identity-bound circuits (age_level3, Level3Inequality) for stronger replay protection
-- **Fast Verification**: <1s verification times; vkeys served with ETag/sha256
+- **Groth16 Circuits**: Age verification, document authenticity, and Level 3 nullifier-binding variants
+- **Level 3**: Identity-bound circuits (`age_level3`, `Level3Inequality`) to prevent replay/transfer
+- **Fast Verification**: <1s verification times; vkeys served with ETag/sha256 + integrity gates
 - **QR-Friendly**: Shareable proof links with QR codes
-- **Production-Ready**: Circom + snarkjs with integrity hashes (INTEGRITY.json)
+- **Production-Ready**: Circom + snarkjs with integrity hashes (`INTEGRITY.json`)
 - **Rebuild**: `make zkp-rebuild` (in `backend-python/zkp`) regenerates wasm/zkey/vkey and hashes
 
 ## 📚 Documentation
@@ -113,8 +128,12 @@ See [SETUP.md](SETUP.md) for complete setup instructions.
 ### Security & Performance
 - [Security Policy](SECURITY.md) - Security policy and vulnerability reporting
 - [ZK-SNARK Guide](backend-python/zkp/README.md) - Zero-knowledge proof setup
+- [Security Features](docs/security-features.md) - Defensive layers, auth, rate limits
+- [Performance Guide](docs/performance.md) - Targets, caching, troubleshooting
 
 ### Additional Resources
+- [Audit Readiness](AUDIT.md) - Checklist and fingerprints
+- [Documentation Review](DOCUMENTATION_REVIEW.md) - Status tracker
 - [Vault Quick Start](docs/vault-quickstart.md) - Quick start for vault features
 - [Personal Proof Vault](docs/personal-proof-vault.md) - Vault overview
 - [Project Scope](docs/Scope.md) - Project scope and requirements
@@ -171,6 +190,9 @@ make test
 cd frontend-app && npm test
 cd backend-graphql && npm test
 cd backend-python && pytest
+
+# ZK property tests (after make zkp-rebuild)
+cd backend-python && ZK_TESTS=1 pytest tests/test_zk_properties.py -v
 ```
 
 ## 📦 Project Structure

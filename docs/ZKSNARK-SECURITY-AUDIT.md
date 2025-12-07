@@ -42,7 +42,8 @@
    ```bash
    # Option 1: Use public Powers of Tau ceremony
    # Download from: https://github.com/iden3/snarkjs#7-prepare-phase-2
-   curl -L https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau -o pot16.ptau
+  curl -L https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau -o pot16.ptau
+  # If proving/compiling large circuits locally, set NODE_OPTIONS="--max-old-space-size=8192" to avoid Node heap OOM.
    
    # Option 2: Run multi-party ceremony (RECOMMENDED)
    # Follow: https://github.com/iden3/snarkjs#8-contribute-to-the-ceremony

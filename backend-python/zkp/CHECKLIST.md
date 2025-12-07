@@ -23,7 +23,7 @@ npm install
 
 # Download Powers of Tau
 mkdir -p artifacts/common
-curl -L https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau \
+curl -L https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau \
   -o artifacts/common/pot16_final.ptau
 
 # Build Age Circuit
@@ -172,4 +172,6 @@ python3 test_circuits.py
 
 **Last Updated**: 2024-12-19  
 **Next Step**: Rebuild circuits (see `REBUILD_CIRCUITS.md`)
+
+**Memory tip**: For level3 circuits, set `NODE_OPTIONS="--max-old-space-size=8192"` while compiling/proving to avoid Node heap OOM (common on Windows).
 

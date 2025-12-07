@@ -21,10 +21,19 @@ on:
 jobs:
   zkp-rebuild:
     runs-on: ubuntu-latest
+    env:
+      ZK_TESTS: "1"
+      PYTHONUNBUFFERED: "1"
+      NODE_OPTIONS: "--max-old-space-size=4096"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -64,13 +73,17 @@ jobs:
       - name: Download ptau if missing
         run: |
           if [ ! -f backend-python/zkp/artifacts/common/pot16_final.ptau ]; then
-            curl -L https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau -o backend-python/zkp/artifacts/common/pot16_final.ptau
+            curl -L --fail https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau -o backend-python/zkp/artifacts/common/pot16_final.ptau
           fi
 
       - name: Rebuild all circuits
         run: |
           cd backend-python/zkp
           make zkp-rebuild
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r backend-python/requirements.txt pytest
 
       - name: Verify vkey integrity
         run: |

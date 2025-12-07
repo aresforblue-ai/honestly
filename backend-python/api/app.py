@@ -1,11 +1,7 @@
 import os
 import json
-import hashlib
-import hmac
-import base64
 import time
 import logging
-from pathlib import Path
 from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -16,17 +12,27 @@ from py2neo import Graph
 from sentence_transformers import SentenceTransformer
 from vector_index.faiss_index import FaissIndex
 
+# Import shared utilities (avoids circular imports)
+from api.utils import (
+    get_vkey_hash, vkeys_ready,
+    load_vkey_hashes, get_artifacts_dir
+)
+
 # Import vault resolvers and routes
 from api.vault_resolvers import query as vault_query, mutation as vault_mutation
 from api.vault_routes import router as vault_router
 from api.auth import decode_authorization_header
 
+# Import monitoring router
+from api.monitoring import router as monitoring_router
+
 # Import Prometheus metrics
 try:
-    from api.prometheus import metrics, get_metrics_endpoint
+    from api.prometheus import get_metrics_endpoint
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
+    get_metrics_endpoint = None
     print("Warning: prometheus_client not installed. Metrics disabled.")
 
 NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
@@ -38,11 +44,9 @@ STRICT_CORS = os.getenv('STRICT_CORS', 'false').lower() == 'true'
 ENABLE_CORS = os.getenv('ENABLE_CORS', 'true').lower() != 'false'
 ENABLE_SECURITY_HEADERS = os.getenv('ENABLE_SECURITY_HEADERS', 'true').lower() != 'false'
 HSTS_MAX_AGE = int(os.getenv('HSTS_MAX_AGE', '31536000'))
-HMAC_SECRET = os.getenv('BUNDLE_HMAC_SECRET')
 RATE_LIMIT_ENABLED = os.getenv('RATE_LIMIT_ENABLED', 'true').lower() != 'false'
 RATE_LIMIT_WINDOW = int(os.getenv('RATE_LIMIT_WINDOW', '60'))
 RATE_LIMIT_MAX = int(os.getenv('RATE_LIMIT_MAX', '60'))  # per window per IP for public/GraphQL
-_VKEY_HASHES = {}  # circuit -> sha256 hex
 _rate_bucket: dict[str, dict] = {}
 logger = logging.getLogger("security")
 
@@ -98,6 +102,152 @@ def resolve_search(_, info, query, topK=5):
             "provenance": c.get('provenance')
         })
     return claims
+
+
+# App/Entity resolvers for Frontend Dashboard
+@query.field("apps")
+def resolve_apps(_, info):
+    """Get all apps/entities from Neo4j."""
+    q = """
+    MATCH (a:App)
+    OPTIONAL MATCH (a)-[:HAS_CLAIM]->(c:Claim)
+    OPTIONAL MATCH (a)-[:HAS_REVIEW]->(r:Review)
+    RETURN a, collect(DISTINCT c) as claims, collect(DISTINCT r) as reviews
+    """
+    results = graph.run(q).data()
+    apps = []
+    for record in results:
+        app_node = record['a']
+        if not app_node:
+            continue
+        apps.append({
+            "id": app_node.get('id'),
+            "name": app_node.get('name', 'Unknown'),
+            "whistlerScore": float(app_node.get('whistlerScore', 0)),
+            "metadata": {
+                "zkProofVerified": app_node.get('zkProofVerified', False),
+                "category": app_node.get('category'),
+                "description": app_node.get('description'),
+            },
+            "claims": [dict(c) for c in record.get('claims', []) if c],
+            "reviews": [dict(r) for r in record.get('reviews', []) if r],
+        })
+    return apps
+
+
+@query.field("app")
+def resolve_app(_, info, id):
+    """Get a specific app by ID."""
+    q = """
+    MATCH (a:App {id: $id})
+    OPTIONAL MATCH (a)-[:HAS_CLAIM]->(c:Claim)
+    OPTIONAL MATCH (c)<-[:REPORTS]-(s:Source)
+    OPTIONAL MATCH (c)-[:HAS_VERDICT]->(v:Verdict)
+    OPTIONAL MATCH (a)-[:HAS_REVIEW]->(r:Review)
+    RETURN a, 
+           collect(DISTINCT {claim: c, source: s, verdicts: collect(DISTINCT v)}) as claims,
+           collect(DISTINCT r) as reviews
+    """
+    results = graph.run(q, id=id).data()
+    if not results or not results[0].get('a'):
+        return None
+    
+    record = results[0]
+    app_node = record['a']
+    
+    claims = []
+    for claim_data in record.get('claims', []):
+        c = claim_data.get('claim')
+        if not c:
+            continue
+        verdicts = claim_data.get('verdicts', [])
+        claims.append({
+            "id": c.get('id'),
+            "statement": c.get('text') or c.get('statement'),
+            "claimHash": c.get('hash') or c.get('claimHash', ''),
+            "verdicts": [
+                {
+                    "outcome": v.get('outcome', 'UNKNOWN'),
+                    "confidence": float(v.get('confidence', 0.5))
+                }
+                for v in verdicts if v
+            ]
+        })
+    
+    reviews = []
+    for r in record.get('reviews', []):
+        if r:
+            reviews.append({
+                "id": r.get('id'),
+                "rating": float(r.get('rating', 0)),
+                "sentiment": r.get('sentiment', 'NEUTRAL'),
+                "text": r.get('text'),
+            })
+    
+    return {
+        "id": app_node.get('id'),
+        "name": app_node.get('name', 'Unknown'),
+        "whistlerScore": float(app_node.get('whistlerScore', 0)),
+        "metadata": {
+            "zkProofVerified": app_node.get('zkProofVerified', False),
+            "category": app_node.get('category'),
+            "description": app_node.get('description'),
+        },
+        "claims": claims,
+        "reviews": reviews,
+    }
+
+
+@query.field("scoreApp")
+def resolve_score_app(_, info, appId):
+    """Calculate and return app score breakdown."""
+    q = """
+    MATCH (a:App {id: $id})
+    OPTIONAL MATCH (a)-[:HAS_SCORE]->(s:Score)
+    RETURN a, s
+    """
+    results = graph.run(q, id=appId).data()
+    if not results or not results[0].get('a'):
+        return None
+    
+    app_node = results[0]['a']
+    score_node = results[0].get('s')
+    
+    # Calculate grade from whistlerScore
+    score = float(app_node.get('whistlerScore', 0))
+    if score >= 90:
+        grade = 'A'
+    elif score >= 80:
+        grade = 'B'
+    elif score >= 70:
+        grade = 'C'
+    elif score >= 60:
+        grade = 'D'
+    else:
+        grade = 'F'
+    
+    # Get breakdown from score node or calculate defaults
+    if score_node:
+        breakdown = {
+            "privacy": {"value": float(score_node.get('privacy', 50)), "label": "Privacy"},
+            "financial": {"value": float(score_node.get('financial', 50)), "label": "Financial"},
+            "security": {"value": float(score_node.get('security', 50)), "label": "Security"},
+            "transparency": {"value": float(score_node.get('transparency', 50)), "label": "Transparency"},
+        }
+    else:
+        # Default breakdown based on overall score
+        breakdown = {
+            "privacy": {"value": score * 0.9, "label": "Privacy"},
+            "financial": {"value": score * 0.85, "label": "Financial"},
+            "security": {"value": score * 0.95, "label": "Security"},
+            "transparency": {"value": score * 0.8, "label": "Transparency"},
+        }
+    
+    return {
+        "grade": grade,
+        "breakdown": breakdown,
+    }
+
 
 # Import vault resolvers (already imported at top)
 # Create mutation type
@@ -160,39 +310,9 @@ if ENABLE_SECURITY_HEADERS:
     app.add_middleware(SecurityHeadersMiddleware)
 
 # Serve zk artifacts (verification keys) statically
-artifacts_dir = Path(__file__).resolve().parent.parent / "zkp" / "artifacts"
+artifacts_dir = get_artifacts_dir()
 artifacts_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/zkp/artifacts", StaticFiles(directory=str(artifacts_dir)), name="zk-artifacts")
-
-
-def _load_vkey_hashes():
-    """Compute SHA-256 hashes of verification keys and ensure presence."""
-    required = {
-        "age": artifacts_dir / "age" / "verification_key.json",
-        "authenticity": artifacts_dir / "authenticity" / "verification_key.json",
-    }
-    missing = [str(p) for p in required.values() if not p.exists()]
-    if missing:
-        raise RuntimeError(f"Missing verification keys: {missing}. Run zkp build to generate real vkeys.")
-    for circuit, path in required.items():
-        data = path.read_bytes()
-        _VKEY_HASHES[circuit] = hashlib.sha256(data).hexdigest()
-
-
-def get_vkey_hash(circuit: str) -> str:
-    return _VKEY_HASHES.get(circuit, "")
-
-
-def hmac_sign(payload: dict) -> str:
-    if not HMAC_SECRET:
-        return ""
-    body = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    digest = hmac.new(HMAC_SECRET.encode(), body, hashlib.sha256).digest()
-    return base64.urlsafe_b64encode(digest).decode()
-
-
-def vkeys_ready() -> bool:
-    return all(_VKEY_HASHES.get(c) for c in ("age", "authenticity"))
 
 
 def _log_security(event: str, request: Request | None = None, **kwargs):
@@ -245,9 +365,6 @@ async def integrity_middleware(request, call_next):
         response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
     return response
 
-def _ensure_vkeys_loaded():
-    if not vkeys_ready():
-        raise RuntimeError("Verification keys are not loaded; startup gating failed.")
 
 async def graphql_context_value(request: Request):
     """Attach authenticated user (if provided) to GraphQL context."""
@@ -268,6 +385,9 @@ app.mount("/graphql", GraphQL(schema, debug=False, context_value=graphql_context
 # Mount vault REST routes
 app.include_router(vault_router)
 
+# Mount monitoring routes
+app.include_router(monitoring_router)
+
 # Prometheus metrics endpoint
 if PROMETHEUS_AVAILABLE:
     @app.get("/metrics")
@@ -279,8 +399,9 @@ if PROMETHEUS_AVAILABLE:
 @app.on_event("startup")
 async def startup_event():
     """Load critical artifacts on startup."""
-    _load_vkey_hashes()
-    _ensure_vkeys_loaded()
+    load_vkey_hashes()
+    if not vkeys_ready():
+        raise RuntimeError("Verification keys are not loaded; startup gating failed.")
 
 # Root endpoint
 @app.get("/")
@@ -325,6 +446,7 @@ async def health_ready():
 
 @app.get("/capabilities")
 async def capabilities():
+    from api.utils import HMAC_SECRET
     return {
         "service": "Truth Engine - Personal Proof Vault",
         "version": "1.0.0",

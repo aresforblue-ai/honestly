@@ -6,7 +6,7 @@ import time
 import hashlib
 import json
 import logging
-from typing import Any, Optional, Callable, Dict
+from typing import Any, Optional, Callable, Dict, Union
 from functools import wraps
 from collections import OrderedDict
 from pathlib import Path
@@ -18,12 +18,8 @@ class SecurityError(Exception):
     """Raised when security check fails."""
     pass
 
-# In-memory cache with LRU eviction
-_cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
-_cache_max_size = 10000
-_cache_stats = {'hits': 0, 'misses': 0, 'evictions': 0}
 
-
+# Forward declaration for type hint
 class CacheEntry:
     """Cache entry with TTL."""
     def __init__(self, value: Any, ttl: float = 300.0):
@@ -33,6 +29,12 @@ class CacheEntry:
     
     def is_expired(self) -> bool:
         return time.time() > self.expires_at
+
+
+# In-memory cache with LRU eviction
+_cache: OrderedDict[str, Union[Dict[str, Any], CacheEntry]] = OrderedDict()
+_cache_max_size = 10000
+_cache_stats = {'hits': 0, 'misses': 0, 'evictions': 0}
 
 
 def _make_key(*args, **kwargs) -> str:
@@ -73,8 +75,8 @@ def get(key: str) -> Optional[Any]:
         # Record Prometheus metric
         try:
             from api.prometheus import metrics
-            metrics.record_cache_miss()
-        except:
+            metrics.record_cache_miss("lru_cache")
+        except Exception:
             pass
         return None
     
@@ -83,8 +85,8 @@ def get(key: str) -> Optional[Any]:
         _cache_stats['misses'] += 1
         try:
             from api.prometheus import metrics
-            metrics.record_cache_miss()
-        except:
+            metrics.record_cache_miss("lru_cache")
+        except Exception:
             pass
         return None
     
@@ -94,8 +96,8 @@ def get(key: str) -> Optional[Any]:
     # Record Prometheus metric
     try:
         from api.prometheus import metrics
-        metrics.record_cache_hit()
-    except:
+        metrics.record_cache_hit("lru_cache")
+    except Exception:
         pass
     return entry.value if isinstance(entry, CacheEntry) else entry
 
@@ -112,7 +114,7 @@ def set(key: str, value: Any, ttl: float = 300.0):
     try:
         from api.prometheus import metrics
         metrics.update_cache_size(len(_cache))
-    except:
+    except Exception:
         pass
 
 

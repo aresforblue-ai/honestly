@@ -3,7 +3,7 @@ Set-Location (Split-Path -Path $MyInvocation.MyCommand.Definition -Parent)
 
 $circuits = @("age", "authenticity", "age_level3", "level3_inequality")
 $ptau = "artifacts/common/pot16_final.ptau"
-$ptauUrl = "https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau"
+$ptauUrl = "https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau"
 
 Write-Host "=== ZKP rebuild (Windows) ==="
 if (!(Test-Path $ptau)) {

@@ -36,7 +36,7 @@ npm install
 
 ```bash
 mkdir -p artifacts/common
-curl -L https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau \
+curl -L https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau \
   -o artifacts/common/pot16_final.ptau
 ```
 
@@ -198,6 +198,7 @@ If you need to rollback:
 
 - **Breaking Change**: Old proofs won't work with new circuits
 - **Storage Required**: Verifier must store used nullifiers (Redis/database)
+- **Memory**: For level3 circuits, set `NODE_OPTIONS="--max-old-space-size=8192"` when compiling/proving to avoid Node/WASM OOM (especially on Windows)
 - **Epoch Management**: Authenticity circuit requires epoch management (increment on document updates)
 
 ---

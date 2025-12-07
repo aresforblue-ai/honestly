@@ -36,7 +36,7 @@ up-min:
 
 zkp-build:
 	cd backend-python/zkp && npm install && \
-	curl -L https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau -o artifacts/common/pot16_final.ptau && \
+	curl -L https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau -o artifacts/common/pot16_final.ptau && \
 	npx circom circuits/age.circom --r1cs --wasm --sym -o artifacts/age && \
 	npx circom circuits/authenticity.circom --r1cs --wasm --sym -o artifacts/authenticity && \
 	npx snarkjs groth16 setup artifacts/age/age.r1cs artifacts/common/pot16_final.ptau artifacts/age/age_0000.zkey && \
@@ -55,7 +55,7 @@ zkp-verify:
 
 zkp-rebuild:
 	cd backend-python/zkp && npm install && \
-	curl -L https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau -o artifacts/common/pot16_final.ptau && \
+	curl -L https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau -o artifacts/common/pot16_final.ptau && \
 	npm run build:age && npm run build:auth && npm run build:age-level3 && npm run build:inequality-level3 && \
 	npm run setup:age && npm run setup:auth && npm run setup:age-level3 && npm run setup:inequality-level3 && \
 	npm run contribute:age && npm run vk:age && \

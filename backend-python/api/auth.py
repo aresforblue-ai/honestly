@@ -1,6 +1,7 @@
 """
 JWT/OIDC authentication helpers.
-Supports RS/ES via OIDC JWKS or HS256 fallback (MVP).
+- Prefer RS/ES via OIDC JWKS.
+- HS256 fallback only when explicitly allowed (ALLOW_HS_FALLBACK=true).
 """
 import os
 import time
@@ -9,6 +10,7 @@ from typing import Optional
 
 import jwt
 from fastapi import HTTPException, Depends
+import logging
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 JWT_SECRET = os.getenv("JWT_SECRET")
@@ -17,8 +19,11 @@ JWT_AUDIENCE = os.getenv("JWT_AUDIENCE")
 JWT_ISSUER = os.getenv("JWT_ISSUER")
 OIDC_JWKS_URL = os.getenv("OIDC_JWKS_URL")
 OIDC_ALGS = [alg.strip() for alg in os.getenv("OIDC_ALGS", "RS256,ES256").split(",") if alg.strip()]
+ALLOW_HS_FALLBACK = os.getenv("ALLOW_HS_FALLBACK", "false").lower() == "true"
+OIDC_REQUIRED = os.getenv("OIDC_REQUIRED", "false").lower() == "true"
 
 security = HTTPBearer(auto_error=False)
+logger = logging.getLogger("security")
 
 
 @lru_cache(maxsize=1)
@@ -44,8 +49,13 @@ def _decode_token(token: str) -> dict:
                 options=options,
             )
         except jwt.PyJWTError as exc:
+            logger.warning("oidc_token_invalid", extra={"error": str(exc)})
             raise HTTPException(status_code=401, detail="Invalid token") from exc
     else:
+        if OIDC_REQUIRED:
+            raise HTTPException(status_code=503, detail="OIDC required but OIDC_JWKS_URL is not configured")
+        if not ALLOW_HS_FALLBACK:
+            raise HTTPException(status_code=503, detail="JWKS not configured and HS fallback disabled")
         if not JWT_SECRET:
             raise HTTPException(status_code=500, detail="JWT_SECRET not configured")
         try:
@@ -58,6 +68,7 @@ def _decode_token(token: str) -> dict:
                 options=options,
             )
         except jwt.PyJWTError as exc:
+            logger.warning("hs_token_invalid", extra={"error": str(exc)})
             raise HTTPException(status_code=401, detail="Invalid token") from exc
 
     exp = payload.get("exp")

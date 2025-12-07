@@ -19,7 +19,7 @@ from blockchain.sdk.fabric_client import FabricClient
 from api.qr_generator import generate_qr_response
 from api.cache import cached, get as cache_get, set as cache_set
 from api.monitoring import record_metric
-from api.app import get_vkey_hash, hmac_sign
+from api.utils import get_vkey_hash, hmac_sign
 from api.auth import get_current_user
 from datetime import datetime
 
@@ -105,7 +105,7 @@ async def upload_document(
         )
         fabric_tx_id = anchor_result.get('transactionId')
     except Exception as e:
-        print(f"Failed to anchor to Fabric: {e}")
+        logger.warning("fabric_anchor_failed", extra={"error": str(e), "document_id": document.id})
         fabric_tx_id = None
     
     # Persist to Neo4j
@@ -204,8 +204,9 @@ async def get_document(document_id: str, user=Depends(get_current_user)):
                 "data": base64.b64encode(doc_data).decode('utf-8')
             }
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve document: {str(e)}")
+    except Exception:
+        logger.exception("document_retrieve_failed", extra={"document_id": document_id, "user_id": uid})
+        raise HTTPException(status_code=500, detail="Failed to retrieve document")
 
 
 @router.get("/share/{token}")

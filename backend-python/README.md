@@ -1,4 +1,5 @@
 # Honestly - Python Backend
+# Last updated: 2025-12-06
 
 Production-ready Python backend for the Honestly Truth Engine, providing secure vault operations, zero-knowledge proofs, AI integration, and enterprise-grade monitoring.
 
@@ -14,15 +15,15 @@ Production-ready Python backend for the Honestly Truth Engine, providing secure 
 
 ### Production Features
 
+- **Auth**: JWT/OIDC (JWKS RS/ES) with optional HS256 fallback; strict mode available
+- **Key Management**: Vault key loader (KMS hook/env/file) with fail-fast if missing
 - **Security Middleware**: Threat detection, IP blocking, rate limiting, security headers
 - **AI Endpoints**: Structured APIs for programmatic access (`/ai/*`) with HMAC signature verification
-- **Monitoring**: Health checks, performance metrics (`/monitoring/*`), Prometheus/Grafana integration
+- **Monitoring**: Health/readiness + Prometheus `/metrics` (Grafana-ready)
 - **Caching**: Redis caching with in-memory fallback for <0.2s response times
 - **Performance Optimization**: Connection pooling, response time tracking, P95/P99 monitoring
-- **Prometheus Metrics**: Comprehensive metrics export at `/metrics` endpoint
-- **Grafana Dashboards**: Pre-configured dashboards for P95/P99 trends and system health
-- **Chaos Testing**: Network partition simulation with ToxiProxy for resilience testing
-- **Comprehensive Testing**: ZK attack surface tests (proof replay, timestamp manipulation, field overflow, malformed Merkle paths)
+- **VKey Integrity**: zk verification keys served with ETag/sha256; gated if missing
+- **Comprehensive Testing**: ZK property tests (replay, timestamp, overflow, Merkle path)
 
 ### Optional Integrations
 
@@ -88,12 +89,11 @@ Structured APIs for programmatic access:
 
 See [AI Endpoints Guide](../docs/ai-endpoints.md) for complete documentation.
 
-### Monitoring Endpoints (`/monitoring/*`)
+### Monitoring & Metrics
 
-- `GET /monitoring/health` - Comprehensive health check
-- `GET /monitoring/metrics` - Performance metrics
-- `GET /monitoring/security/events` - Security event log
-- `GET /monitoring/security/threats` - Threat detection summary
+- `GET /health/live` - Liveness
+- `GET /health/ready` - Readiness (vkeys + Neo4j)
+- `GET /metrics` - Prometheus (if enabled)
 
 See [Monitoring Guide](../docs/monitoring.md) for details.
 
@@ -105,8 +105,7 @@ See [Monitoring Guide](../docs/monitoring.md) for details.
 
 ### GraphQL Endpoint
 
-- `POST /graphql` - GraphQL API (Ariadne)
-- Interactive docs: `GET /graphql` (if enabled)
+- `POST /graphql` - GraphQL API (Ariadne) with user context from JWT/OIDC
 
 ## 🔒 Security Features
 
@@ -175,7 +174,12 @@ ALLOWED_ORIGINS=http://localhost:5173
 ENABLE_CORS=true
 ENABLE_HSTS=true
 ENABLE_DOCS=true  # Set to false in production
-JWT_SECRET=change-me                   # required for auth
+# Auth (prefer OIDC JWKS)
+OIDC_JWKS_URL=https://issuer.example.com/.well-known/jwks.json
+OIDC_ALGS=RS256,ES256
+OIDC_REQUIRED=true          # fail if JWKS missing
+ALLOW_HS_FALLBACK=false     # set true only if you intentionally use HS256
+JWT_SECRET=change-me        # only used if HS fallback allowed
 JWT_ALGO=HS256
 # Optional:
 # JWT_AUDIENCE=your-audience
@@ -189,6 +193,7 @@ AI_API_KEY=your-api-key-here
 
 # Vault Encryption
 VAULT_ENCRYPTION_KEY=<base64-encoded-256-bit-key>
+VAULT_KEY_FILE=<path-to-key-file>       # optional file-based key
 KMS_KEY_ID=<kms-key-id>                 # recommended: manage keys via KMS/Vault
 KMS_REGION=<region>                     # if using cloud KMS
 ALLOW_GENERATED_VAULT_KEY=false         # set true only for local dev if no key is provided
@@ -245,8 +250,26 @@ backend-python/
 
 The backend includes production-ready Groth16 circuits for:
 
-- **Age Verification**: Prove age >= threshold without revealing birthdate
-- **Document Authenticity**: Prove document hash exists in Merkle tree
+- **Age Verification** (`age`): Prove age >= threshold without revealing birthdate
+- **Document Authenticity** (`authenticity`): Prove document hash exists in Merkle tree
+- **Level 3 / Nullifier-Binding** (`age_level3`, `Level3Inequality`): Identity-bound variants to prevent replay/transfer
+
+Rebuild & integrity:
+
+```bash
+cd zkp
+make zkp-rebuild                       # rebuild wasm/zkey/vkey + hashes
+python scripts/verify_key_integrity.py # regenerate INTEGRITY.json
+```
+
+Memory note: for level3 proving/compilation locally, set `NODE_OPTIONS="--max-old-space-size=8192"` (Windows often needs this) before running `npm run build:*` or `node snark-runner.js`.
+
+Tests:
+
+```bash
+cd ..
+ZK_TESTS=1 pytest tests/test_zk_properties.py -v  # requires built artifacts and node on PATH
+```
 
 See [ZK-SNARK Guide](zkp/README.md) for setup and usage.
 
@@ -308,6 +331,8 @@ Key production considerations:
 - [Production Guide](PRODUCTION.md) - Production deployment
 - [AI Endpoints](../docs/ai-endpoints.md) - AI API documentation
 - [Monitoring Guide](../docs/monitoring.md) - Monitoring documentation
+- [Security Features](../docs/security-features.md) - Auth, rate limits, headers, key management
+- [Performance Guide](../docs/performance.md) - Targets, caching, load testing
 - [ZK-SNARK Guide](zkp/README.md) - Zero-knowledge proof setup
 - [Architecture](../ARCHITECTURE.md) - System architecture
 
@@ -326,4 +351,4 @@ Key production considerations:
 ---
 
 **Version**: 1.0.0  
-**Last Updated**: 2024-12-19
+**Last Updated**: 2025-12-06

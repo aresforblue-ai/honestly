@@ -19,7 +19,7 @@ Groth16 + Circom/snarkjs pipeline for fast (<1s) verification and QR-friendly pa
 cd backend-python/zkp
 npm install
 # Get a ptau (example: powers of tau 16); adjust size to your tree depth/constraints
-curl -L https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau -o artifacts/common/pot16_final.ptau
+curl -L https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau -o artifacts/common/pot16_final.ptau
 
 # Build circuits
 npx circom circuits/age.circom --r1cs --wasm --sym -o artifacts/age
@@ -43,8 +43,8 @@ You can use npm scripts already defined in `package.json`:
 ```bash
 cd backend-python/zkp
 npm install
-# Download ptau once
-curl -L https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau -o artifacts/common/pot16_final.ptau
+# Download ptau once (mirror that works in CI)
+curl -L https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau -o artifacts/common/pot16_final.ptau
 
 # Compile
 npm run build:age
@@ -64,6 +64,7 @@ npm run contribute:auth && npm run vk:auth
 npm run contribute:age-level3 && npm run vk:age-level3
 npm run contribute:inequality-level3 && npm run vk:inequality-level3
 npm run hash:vkeys
+python scripts/verify_key_integrity.py   # refresh INTEGRITY.json + *.sha256
 ```
 
 Artifacts land under `artifacts/<circuit>/` (wasm/zkey/vkey). Regenerate proofs after rebuilding.
@@ -125,3 +126,5 @@ echo '["0x01","0x02","0x03"]' | node poseidon-hash.js
 - Public signals order matters; the runner returns both the raw `publicSignals` array and a named map.
 - If artifacts are missing, the runner returns a clear error directing you to build them.
 - Sample inputs/proofs are in `samples/` for quick smoke tests. Replace placeholder vk/proofs with real generated ones for production.
+- Heavy circuits (level3) may need a larger Node heap during build/proving: set `NODE_OPTIONS="--max-old-space-size=8192"`; Windows is more likely to need this.
+- Property tests: from `backend-python`, run `ZK_TESTS=1 pytest tests/test_zk_properties.py -v` after rebuilding artifacts.

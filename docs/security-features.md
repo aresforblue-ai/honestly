@@ -18,12 +18,11 @@ Honestly implements multiple layers of security:
 
 ### 1. Authentication & Authorization
 
-#### JWT Authentication
-- **Implementation**: `api/security.py`
-- **Algorithm**: RS256 (recommended) or HS256
-- **Token Expiry**: Configurable (default: 1 hour)
-- **Refresh Tokens**: Supported for long-lived sessions
-- **Key Rotation**: Supported via environment variables
+#### JWT/OIDC Authentication
+- **Implementation**: `api/auth.py`
+- **Algorithm**: RS/ES via JWKS; HS256 only if `ALLOW_HS_FALLBACK=true`
+- **OIDC Required**: Set `OIDC_REQUIRED=true` to fail if JWKS missing
+- **Config**: `OIDC_JWKS_URL`, `OIDC_ALGS`, `JWT_AUDIENCE`, `JWT_ISSUER`
 
 #### API Key Authentication
 - **Endpoint**: `/ai/*`
@@ -148,11 +147,11 @@ ALLOWED_ORIGINS=https://app.honestly.dev,https://api.honestly.dev
 - **Storage**: In-memory (configurable for persistence)
 - **Retention**: Configurable (default: 1000 events)
 
-### 7. Encryption
+### 7. Encryption & Key Management
 
 #### Data at Rest
 - **Algorithm**: AES-256-GCM
-- **Key Management**: Environment variable `VAULT_ENCRYPTION_KEY`
+- **Key Loader**: KMS hook → env `VAULT_ENCRYPTION_KEY` → `VAULT_KEY_FILE`; fail-fast if none and `ALLOW_GENERATED_VAULT_KEY=false`
 - **Key Format**: Base64-encoded 256-bit key
 - **IV**: Random per encryption
 - **Storage**: Encrypted documents stored in Neo4j
@@ -178,6 +177,7 @@ ALLOWED_ORIGINS=https://app.honestly.dev,https://api.honestly.dev
 #### Proof Verification
 - **Client-Side**: Primary verification method
 - **Server-Side**: Optional via `/ai/verify-proof`
+- **Integrity**: Verification keys served with ETag/sha256; requests gated if vkeys missing
 - **Performance**: <0.2s verification time target
 
 #### Attack Surface Mitigation
@@ -204,8 +204,7 @@ ALLOWED_ORIGINS=https://app.honestly.dev,https://api.honestly.dev
 
 #### Health Checks
 - **Liveness**: `GET /health/live` (<0.05s)
-- **Readiness**: `GET /health/ready` (checks dependencies)
-- **Comprehensive**: `GET /monitoring/health` (full system check)
+- **Readiness**: `GET /health/ready` (checks dependencies, vkeys)
 
 #### Metrics
 - **Prometheus**: `/metrics` endpoint

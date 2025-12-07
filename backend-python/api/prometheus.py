@@ -3,7 +3,6 @@ Prometheus metrics exporter for monitoring.
 Exposes metrics for Grafana dashboard integration.
 """
 import time
-from typing import Dict, Any
 from fastapi import APIRouter, Response
 from prometheus_client import (
     Counter,
@@ -48,6 +47,11 @@ cache_misses_total = Counter(
     ['cache_type']
 )
 
+cache_size_gauge = Gauge(
+    'cache_size',
+    'Current cache size'
+)
+
 rate_limit_hits_total = Counter(
     'rate_limit_hits_total',
     'Total rate limit hits',
@@ -77,6 +81,53 @@ uptime_seconds = Gauge(
 _start_time = time.time()
 
 
+class MetricsRecorder:
+    """
+    Metrics recorder class that provides a unified interface for recording metrics.
+    This allows for `from api.prometheus import metrics` style imports.
+    """
+    
+    @staticmethod
+    def record_request(method: str, endpoint: str, status: int, duration: float):
+        """Record HTTP request metrics."""
+        http_requests_total.labels(method=method, endpoint=endpoint, status=status).inc()
+        http_request_duration_seconds.labels(method=method, endpoint=endpoint).observe(duration)
+    
+    @staticmethod
+    def record_verification(circuit: str, result: str, duration: float):
+        """Record verification metrics."""
+        verification_duration_seconds.labels(circuit=circuit, result=result).observe(duration)
+    
+    @staticmethod
+    def record_cache_hit(cache_type: str = "default"):
+        """Record cache hit."""
+        cache_hits_total.labels(cache_type=cache_type).inc()
+    
+    @staticmethod
+    def record_cache_miss(cache_type: str = "default"):
+        """Record cache miss."""
+        cache_misses_total.labels(cache_type=cache_type).inc()
+    
+    @staticmethod
+    def update_cache_size(size: int):
+        """Update cache size gauge."""
+        cache_size_gauge.set(size)
+    
+    @staticmethod
+    def record_rate_limit_hit(endpoint: str, ip: str):
+        """Record rate limit hit."""
+        rate_limit_hits_total.labels(endpoint=endpoint, ip=ip).inc()
+    
+    @staticmethod
+    def set_active_connections(count: int):
+        """Set active database connections gauge."""
+        active_connections.set(count)
+
+
+# Export singleton instance for `from api.prometheus import metrics` usage
+metrics = MetricsRecorder()
+
+
 @router.get("/prometheus")
 async def prometheus_metrics():
     """Prometheus metrics endpoint."""
@@ -97,28 +148,41 @@ async def prometheus_metrics():
     )
 
 
+def get_metrics_endpoint():
+    """Get metrics endpoint response for external use."""
+    uptime_seconds.set(time.time() - _start_time)
+    return Response(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST
+    )
+
+
+# Legacy function exports for backward compatibility
 def record_request(method: str, endpoint: str, status: int, duration: float):
     """Record HTTP request metrics."""
-    http_requests_total.labels(method=method, endpoint=endpoint, status=status).inc()
-    http_request_duration_seconds.labels(method=method, endpoint=endpoint).observe(duration)
+    metrics.record_request(method, endpoint, status, duration)
 
 
 def record_verification(circuit: str, result: str, duration: float):
     """Record verification metrics."""
-    verification_duration_seconds.labels(circuit=circuit, result=result).observe(duration)
+    metrics.record_verification(circuit, result, duration)
 
 
-def record_cache_hit(cache_type: str):
+def record_cache_hit(cache_type: str = "default"):
     """Record cache hit."""
-    cache_hits_total.labels(cache_type=cache_type).inc()
+    metrics.record_cache_hit(cache_type)
 
 
-def record_cache_miss(cache_type: str):
+def record_cache_miss(cache_type: str = "default"):
     """Record cache miss."""
-    cache_misses_total.labels(cache_type=cache_type).inc()
+    metrics.record_cache_miss(cache_type)
 
 
 def record_rate_limit(endpoint: str, ip: str):
     """Record rate limit hit."""
-    rate_limit_hits_total.labels(endpoint=endpoint, ip=ip).inc()
+    metrics.record_rate_limit_hit(endpoint, ip)
 
+
+def update_cache_size(size: int):
+    """Update cache size gauge."""
+    metrics.update_cache_size(size)

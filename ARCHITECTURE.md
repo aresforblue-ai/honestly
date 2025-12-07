@@ -1,4 +1,5 @@
 # Honestly - System Architecture
+# Last updated: 2025-12-06
 
 This document describes the complete architecture of the Honestly Truth Engine platform.
 
@@ -8,24 +9,7 @@ This document describes the complete architecture of the Honestly Truth Engine p
 ┌─────────────────────────────────────────────────────────────┐
 │                         USER LAYER                          │
 │  ┌────────────────┐         ┌─────────────────────┐         │
-│  │   Web Browser  │────────▶│  Mobile App (Future)│         │lanned execution (in order):
-1) Backend security
-Add JWT/OIDC auth for vault routes (replace mock user), enforce on upload/document/share creation.
-KMS/Vault key loader for VAULT_ENCRYPTION_KEY with env fallback; fail fast if missing.
-Harden rate limits and sanitized errors on public GETs; structured security logs.
-2) ZK alignment
-Rebuild all circuits (age/auth/level3), refresh INTEGRITY.json and vkey hashes.
-Add circuit property tests for level3 (nullifier/identity binding, Merkle/path validity), run in CI.
-3) Frontend (ConductMe)
-Trust Bridge client: Semaphore identity create/load, proof gen/verify stub.
-EIP-712 action signing wired with ethers; optional wallet connect.
-Workflow builder already scaffolded; keep React Flow + Zustand, add save/load stubs.
-Local LLM proxy API route + health polling hook; env-configurable endpoints.
-4) CI/CD
-Fix Codacy (install curl or disable MCP hook); ensure CI runs make zkp-rebuild, integrity check, circuit tests, and uploads artifacts.
-5) Docs
-Update main/architecture/backend README to reflect auth/KMS, vkey gating, LLM proxy, trust bridge, signing.
-Confirm if you want me to start with step 1 (backend auth/KMS) and step 2 (ZK rebuild/tests) now; I’ll then move to the frontend proxy/trust/signing, followed by CI fixes and doc updates
+│  │   Web Browser  │────────▶│  Mobile App (Future)│         │
 │  └────────────────┘         └─────────────────────┘         │
 └────────────┬────────────────────────────────────────────────┘
              │
@@ -33,35 +17,46 @@ Confirm if you want me to start with step 1 (backend auth/KMS) and step 2 (ZK re
 ┌─────────────────────────────────────────────────────────────┐
 │                      FRONTEND LAYER                         │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │         React + Vite Application                     │   │
+│  │  React + Vite (frontend-app)                         │   │
 │  │  - AppWhistler UI                                    │   │
 │  │  - Trust Score Dashboard                             │   │
 │  │  - Claims Verification Interface                     │   │
+│  ├──────────────────────────────────────────────────────┤   │
+│  │  ConductMe Core (Next.js)                            │   │
+│  │  - Trust Bridge (Semaphore identity + proofs)        │   │
+│  │  - Workflow Builder (React Flow + Zustand)           │   │
+│  │  - EIP-712 signing + wallet placeholder              │   │
+│  │  - Local LLM proxy route                             │   │
 │  └──────────────────────────────────────────────────────┘   │
 └────────────┬────────────────────────────────────────────────┘
              │
-             │ HTTP/GraphQL
+             │ HTTP/GraphQL/REST
              ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                      BACKEND LAYER                          │
 │  ┌─────────────────────┐      ┌────────────────────────┐   │
 │  │ GraphQL Backend     │      │  Python Backend         │   │
-│  │ (Node.js/Apollo)    │◀────▶│  (FastAPI)             │   │
+│  │ (Node.js/Apollo)    │◀────▶│  (FastAPI)              │   │
 │  │                     │      │                         │   │
 │  │ - App Verification  │      │ ┌────────────────────┐ │   │
 │  │ - Scoring Engine    │      │ │ Security Middleware│ │   │
 │  │ - Claims/Evidence   │      │ │ - Threat Detection │ │   │
 │  │ - Provenance        │      │ │ - Rate Limiting     │ │   │
-│  └─────────────────────┘      │ │ - IP Blocking      │ │   │
-│                                 │ └────────────────────┘ │   │
-│                                 │                         │   │
-│                                 │ - Vault Management      │   │
-│                                 │ - ZK Proofs (Groth16: age, authenticity, level3 nullifier-binding) │   │
-│                                 │ - AI Endpoints (/ai/*) │   │
-│                                 │ - Monitoring (/monitoring/*)│
-│                                 │ - Kafka Integration     │   │
-│                                 │ - FAISS Search          │   │
-│                                 └────────────────────────┘   │
+│  └─────────────────────┘      │ │ - IP Blocking       │ │   │
+│                                │ │ - Security Headers  │ │   │
+│                                │ │ - CORS + strict allowlist││   │
+│                                │ └────────────────────┘ │   │
+│                                │                         │   │
+│                                │ - JWT/OIDC auth (JWKS; HS fallback) │
+│                                │ - Vault key loader (KMS/env/file; fail-fast) │
+│                                │ - Vault Management      │   │
+│                                │ - ZK Proofs (Groth16: age, authenticity, level3 nullifier-binding) │
+│                                │ - VKey caching (ETag/sha256 + integrity gate) │
+│                                │ - AI Endpoints (/ai/*)  │   │
+│                                │ - Monitoring (/monitoring/*)│
+│                                │ - Kafka Integration      │  │
+│                                │ - FAISS Search           │  │
+│                                └────────────────────────┘   │
 └────────────┬──────────────────────────┬────────────────────┘
              │                          │
              ▼                          ▼
@@ -321,18 +316,10 @@ Graph-based claim and provenance storage:
 
 ### Authentication & Authorization
 
-**AI Endpoints**: API key authentication (`X-API-Key` header)
-```python
-# AI endpoint authentication
-def validate_api_key(x_api_key: str = Header(None)):
-    expected_key = os.getenv("AI_API_KEY")
-    if x_api_key != expected_key:
-        raise HTTPException(401, "Invalid API key")
-    return x_api_key
-```
-
-**Vault Endpoints**: User-based authentication (MVP: mock user ID)
-**Future**: JWT-based authentication for all endpoints
+- **Vault/GraphQL**: JWT/OIDC via JWKS (RS/ES) with HS256 fallback; user attached to request context.
+- **AI Endpoints**: API key authentication (`X-API-Key`) plus optional IP allowlist.
+- **Public Bundles**: `/vault/share/{token}` and `/vault/share/{token}/bundle` rate-limited and error-sanitized.
+- **Key Management**: Vault master key loaded from KMS/env/file; generation only if `ALLOW_GENERATED_VAULT_KEY=true` (dev).
 
 ### Security Features
 
@@ -351,7 +338,7 @@ def validate_api_key(x_api_key: str = Header(None)):
 
 ### Zero-Knowledge Proofs
 
-Production-ready Groth16 circuits for privacy-preserving verification:
+Production-ready Groth16 circuits for privacy-preserving verification (age, authenticity, level3 nullifier-binding). Verification keys are served from `/zkp/artifacts/...` with ETag/sha256 integrity gating; rebuild via `make zkp-rebuild` to regenerate wasm/zkey/vkey plus `INTEGRITY.json`.
 
 ```python
 # Age verification proof (Groth16)

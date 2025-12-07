@@ -2,11 +2,14 @@
 // Tie to Trust Bridge identity (Semaphore proof) for identity-bound logs.
 import { ethers, TypedDataField, TypedDataDomain } from "ethers";
 
-const domain: TypedDataDomain = {
+const DEFAULT_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID || "1");
+const DEFAULT_CONTRACT = process.env.NEXT_PUBLIC_VERIFYING_CONTRACT || "0x0000000000000000000000000000000000000000";
+
+const baseDomain: TypedDataDomain = {
   name: "ConductMe",
   version: "1",
-  chainId: 1, // TODO: make dynamic
-  verifyingContract: "0x0000000000000000000000000000000000000000", // TODO: set if on-chain
+  chainId: DEFAULT_CHAIN_ID,
+  verifyingContract: DEFAULT_CONTRACT,
 };
 
 const types: Record<string, TypedDataField[]> = {
@@ -25,8 +28,20 @@ export type ActionLog = {
   humanProof: string;
 };
 
-export async function signAction(signer: ethers.Signer, action: ActionLog): Promise<string> {
+export function getSigningDomain(overrides?: Partial<TypedDataDomain>): TypedDataDomain {
+  return {
+    ...baseDomain,
+    ...overrides,
+  };
+}
+
+export async function signAction(
+  signer: ethers.Signer,
+  action: ActionLog,
+  overrides?: Partial<TypedDataDomain>
+): Promise<string> {
   const message = { ...action, timestamp: action.timestamp.toString() };
+  const domain = getSigningDomain(overrides);
   return signer.signTypedData(domain, types, message);
 }
 

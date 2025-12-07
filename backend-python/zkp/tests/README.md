@@ -58,7 +58,7 @@ Comprehensive test suite for validating zkSNARK circuit correctness, security, a
    npm install
    
    # Download Powers of Tau
-   curl -L https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau \
+  curl -L https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau \
      -o artifacts/common/pot16_final.ptau
    
    # Build and setup circuits
@@ -183,6 +183,7 @@ Check that:
 - All required fields are present
 - Values are within expected ranges
 - Circuit artifacts exist
+- If Node crashes or OOMs on level3 circuits, retry with `NODE_OPTIONS="--max-old-space-size=8192"` (Windows often needs this).
 
 ### "Verification fails"
 Ensure:
