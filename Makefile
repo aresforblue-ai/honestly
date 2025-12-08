@@ -29,7 +29,7 @@ install:
 	cd backend-python && pip install -r requirements.txt
 
 up:
-	docker-compose -f docker-compose-updated.yml up -d
+	docker-compose up -d
 
 up-min:
 	docker compose -f docker-compose.min.yml up --build

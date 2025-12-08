@@ -4,7 +4,7 @@
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Build](https://github.com/aresforblue-ai/honestly/workflows/CI/badge.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg)
 ![Coverage](https://img.shields.io/badge/coverage-85%25-yellow.svg)
 
 **A production-ready, blockchain-verified identity and credential verification system with zero-knowledge proofs, AI integration, and enterprise-grade security.**
@@ -353,9 +353,17 @@ See [SECURITY.md](SECURITY.md) for details.
 
 ## 📄 License
 
-**MIT License** — Permission is hereby granted, free of charge, to any person obtaining a copy of this software to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies.
+**GNU Affero General Public License v3.0 (AGPL-3.0-only)**
 
-See [LICENSE](LICENSE) for full terms.
+This software is licensed under the GNU Affero General Public License version 3 ONLY, with additional attribution requirements. Key points:
+
+- ✅ Free to use, modify, and distribute
+- ✅ Source code must be made available
+- ✅ Network use triggers copyleft (AGPL requirement)
+- ⚠️ Must include attribution to aresforblue-ai
+- ⚠️ Production deployments should publish on-chain proof
+
+See [LICENSE](LICENSE) and [LICENSE-EXTRAS.md](LICENSE-EXTRAS.md) for full terms and additional requirements.
 
 ---
 

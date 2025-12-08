@@ -157,7 +157,6 @@ const Navigation = () => {
 // ============================================
 // GRADE BADGE COMPONENT
 // ============================================
-// eslint-disable-next-line react/prop-types
 const GradeBadge = ({ score, size = 'default' }) => {
   let grade = 'F';
   let gradientClass = 'from-red-500 to-red-600';
@@ -196,7 +195,6 @@ const GradeBadge = ({ score, size = 'default' }) => {
 // ============================================
 // ZK STATUS COMPONENT
 // ============================================
-// eslint-disable-next-line react/prop-types
 const ZKStatus = ({ isVerified }) => (
   <div className={`flex items-center gap-2 px-3 py-1.5 text-xs font-mono rounded-full transition-all ${
     isVerified 
@@ -211,7 +209,6 @@ const ZKStatus = ({ isVerified }) => (
 // ============================================
 // STATS COUNTER
 // ============================================
-// eslint-disable-next-line react/prop-types
 const StatCounter = ({ value, label, icon: Icon }) => {
   const [count, setCount] = useState(0);
   

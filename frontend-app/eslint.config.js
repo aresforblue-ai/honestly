@@ -48,6 +48,8 @@ export default [
         'warn',
         { allowConstantExport: true },
       ],
+      // Disable prop-types requirement for modern React with JSX runtime
+      'react/prop-types': 'off',
     },
     settings: {
       react: {
