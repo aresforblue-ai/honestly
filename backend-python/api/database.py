@@ -4,8 +4,11 @@ Prevents multiple connection instantiation across modules.
 """
 import os
 import logging
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from functools import lru_cache
+
+if TYPE_CHECKING:
+    from py2neo import Graph
 
 logger = logging.getLogger(__name__)
 

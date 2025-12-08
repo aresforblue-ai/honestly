@@ -17,10 +17,10 @@ Environment Variables:
 import os
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List, Literal
+from typing import List, Literal
 from functools import wraps
 
-from fastapi import HTTPException, Depends, Request
+from fastapi import HTTPException, Depends, Request, APIRouter
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 from pydantic import BaseModel
@@ -305,8 +305,6 @@ def graphql_require_permission(*permissions: str):
 # =============================================================================
 # Auth Routes (add to FastAPI app)
 # =============================================================================
-
-from fastapi import APIRouter
 
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 

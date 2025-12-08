@@ -13,11 +13,9 @@ Features:
 """
 
 import os
-import json
 import secrets
-from datetime import datetime
-from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Depends, status, Body
+from typing import List, Dict, Any
+from fastapi import APIRouter, HTTPException, status, Body
 from pydantic import BaseModel, Field
 
 # Import identity modules

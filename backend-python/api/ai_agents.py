@@ -4,11 +4,9 @@ Designed for flawless AI interaction with the vault system.
 """
 import os
 import json
-import hashlib
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Request, Depends, status, Header
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Depends, status, Header
 from pydantic import BaseModel, Field, validator
 from py2neo import Graph
 
