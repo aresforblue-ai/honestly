@@ -2,7 +2,7 @@
 
 This doc packages the essentials for an external cryptographic/security audit (e.g., Trail of Bits, Zellic).
 
-**Commit**: `78e9f47ece844e7814b7482757986b75dd5c9434`
+**Commit**: `2e3b5c55113119814da3fd9bac3a5058a89f39dc`
 
 ## Scope
 
@@ -192,4 +192,4 @@ Capture and attach k6 summary (p95/p99, errors). Optimize vkey caching/bundle si
 - Environment config (CORS, auth, rate limits)
 - API surface list and versions (circom/snarkjs/npm lockfile)
 - k6 report, ZAP report
-- Commit hash: `78e9f47ece844e7814b7482757986b75dd5c9434`
+- Commit hash: `2e3b5c55113119814da3fd9bac3a5058a89f39dc`
