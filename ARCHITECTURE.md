@@ -1,4 +1,5 @@
 # Honestly - System Architecture
+# Last updated: 2025-12-06
 
 This document describes the complete architecture of the Honestly Truth Engine platform.
 
@@ -16,35 +17,46 @@ This document describes the complete architecture of the Honestly Truth Engine p
 ┌─────────────────────────────────────────────────────────────┐
 │                      FRONTEND LAYER                         │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │         React + Vite Application                     │   │
+│  │  React + Vite (frontend-app)                         │   │
 │  │  - AppWhistler UI                                    │   │
 │  │  - Trust Score Dashboard                             │   │
 │  │  - Claims Verification Interface                     │   │
+│  ├──────────────────────────────────────────────────────┤   │
+│  │  ConductMe Core (Next.js)                            │   │
+│  │  - Trust Bridge (Semaphore identity + proofs)        │   │
+│  │  - Workflow Builder (React Flow + Zustand)           │   │
+│  │  - EIP-712 signing + wallet placeholder              │   │
+│  │  - Local LLM proxy route                             │   │
 │  └──────────────────────────────────────────────────────┘   │
 └────────────┬────────────────────────────────────────────────┘
              │
-             │ HTTP/GraphQL
+             │ HTTP/GraphQL/REST
              ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                      BACKEND LAYER                          │
 │  ┌─────────────────────┐      ┌────────────────────────┐   │
 │  │ GraphQL Backend     │      │  Python Backend         │   │
-│  │ (Node.js/Apollo)    │◀────▶│  (FastAPI)             │   │
+│  │ (Node.js/Apollo)    │◀────▶│  (FastAPI)              │   │
 │  │                     │      │                         │   │
 │  │ - App Verification  │      │ ┌────────────────────┐ │   │
 │  │ - Scoring Engine    │      │ │ Security Middleware│ │   │
 │  │ - Claims/Evidence   │      │ │ - Threat Detection │ │   │
 │  │ - Provenance        │      │ │ - Rate Limiting     │ │   │
-│  └─────────────────────┘      │ │ - IP Blocking      │ │   │
-│                                 │ └────────────────────┘ │   │
-│                                 │                         │   │
-│                                 │ - Vault Management      │   │
-│                                 │ - ZK Proofs (Groth16)   │   │
-│                                 │ - AI Endpoints (/ai/*) │   │
-│                                 │ - Monitoring (/monitoring/*)│
-│                                 │ - Kafka Integration     │   │
-│                                 │ - FAISS Search          │   │
-│                                 └────────────────────────┘   │
+│  └─────────────────────┘      │ │ - IP Blocking       │ │   │
+│                                │ │ - Security Headers  │ │   │
+│                                │ │ - CORS + strict allowlist││   │
+│                                │ └────────────────────┘ │   │
+│                                │                         │   │
+│                                │ - JWT/OIDC auth (JWKS; HS fallback) │
+│                                │ - Vault key loader (KMS/env/file; fail-fast) │
+│                                │ - Vault Management      │   │
+│                                │ - ZK Proofs (Groth16: age, authenticity, level3 nullifier-binding) │
+│                                │ - VKey caching (ETag/sha256 + integrity gate) │
+│                                │ - AI Endpoints (/ai/*)  │   │
+│                                │ - Monitoring (/monitoring/*)│
+│                                │ - Kafka Integration      │  │
+│                                │ - FAISS Search           │  │
+│                                └────────────────────────┘   │
 └────────────┬──────────────────────────┬────────────────────┘
              │                          │
              ▼                          ▼
@@ -58,7 +70,7 @@ This document describes the complete architecture of the Honestly Truth Engine p
 │  ┌──────────────────┐  ┌──────────────────────────────┐  │
 │  │  Redis Cache     │  │  Monitoring & Metrics        │  │
 │  │  (Optional)      │  │  - Health Checks             │  │
-│  │  - VKeys         │  │  - Performance Metrics       │  │
+│  │  - VKeys (ETag/sha256) │  │  - Performance Metrics       │  │
 │  │  - Share Bundles │  │  - Security Events           │  │
 │  │  - Metadata      │  │  - System Resources          │  │
 │  └──────────────────┘  └──────────────────────────────┘  │
@@ -304,18 +316,10 @@ Graph-based claim and provenance storage:
 
 ### Authentication & Authorization
 
-**AI Endpoints**: API key authentication (`X-API-Key` header)
-```python
-# AI endpoint authentication
-def validate_api_key(x_api_key: str = Header(None)):
-    expected_key = os.getenv("AI_API_KEY")
-    if x_api_key != expected_key:
-        raise HTTPException(401, "Invalid API key")
-    return x_api_key
-```
-
-**Vault Endpoints**: User-based authentication (MVP: mock user ID)
-**Future**: JWT-based authentication for all endpoints
+- **Vault/GraphQL**: JWT/OIDC via JWKS (RS/ES) with HS256 fallback; user attached to request context.
+- **AI Endpoints**: API key authentication (`X-API-Key`) plus optional IP allowlist.
+- **Public Bundles**: `/vault/share/{token}` and `/vault/share/{token}/bundle` rate-limited and error-sanitized.
+- **Key Management**: Vault master key loaded from KMS/env/file; generation only if `ALLOW_GENERATED_VAULT_KEY=true` (dev).
 
 ### Security Features
 
@@ -334,7 +338,7 @@ def validate_api_key(x_api_key: str = Header(None)):
 
 ### Zero-Knowledge Proofs
 
-Production-ready Groth16 circuits for privacy-preserving verification:
+Production-ready Groth16 circuits for privacy-preserving verification (age, authenticity, level3 nullifier-binding). Verification keys are served from `/zkp/artifacts/...` with ETag/sha256 integrity gating; rebuild via `make zkp-rebuild` to regenerate wasm/zkey/vkey plus `INTEGRITY.json`.
 
 ```python
 # Age verification proof (Groth16)

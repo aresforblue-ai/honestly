@@ -1,4 +1,5 @@
 # AI Endpoints Guide
+# Last updated: 2025-12-06
 
 Structured API endpoints for programmatic access to Honestly's verification services. Designed for AI agents, automation, and integration.
 
@@ -23,7 +24,7 @@ export AI_API_KEY=your-secure-api-key
 | `/ai/verify-proofs-batch` | POST | Batch verify proofs | 10/min |
 | `/ai/share-link` | POST | Create shareable link | 50/min |
 | `/ai/share/{token}/info` | GET | Get share link info | 100/min |
-| `/ai/status` | GET | API status | 100/min |
+| `/ai/status` | GET | API status/capabilities | 100/min |
 
 ## 📝 Standard Response Format
 
@@ -97,8 +98,10 @@ curl -X POST https://api.honestly.dev/ai/verify-proof \
 ```
 
 **Proof Types**:
-- `age_proof`: Age verification proof
-- `authenticity_proof`: Document authenticity proof
+- `age_proof` / `age` (Groth16 age)
+- `authenticity_proof` / `authenticity` (Groth16 Merkle auth)
+- `age_level3` (nullifier-bound age)
+- `inequality_level3` (nullifier-bound inequality)
 
 ---
 

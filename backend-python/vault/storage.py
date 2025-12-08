@@ -14,6 +14,8 @@ from cryptography.hazmat.backends import default_backend
 import base64
 import logging
 
+from vault.key_loader import load_master_key
+
 from vault.models import ProofDocument, DocumentType
 
 logger = logging.getLogger(__name__)
@@ -37,20 +39,8 @@ class VaultStorage:
         self.key_version = 1
         self.key_history: Dict[int, bytes] = {}
         
-        # Get or generate encryption key
-        if encryption_key:
-            self.master_key = base64.b64decode(encryption_key)
-        else:
-            env_key = os.getenv('VAULT_ENCRYPTION_KEY')
-            if env_key:
-                self.master_key = base64.b64decode(env_key)
-            else:
-                # Generate a new key (in production, this should be stored securely)
-                self.master_key = AESGCM.generate_key(bit_length=256)
-                logger.warning("Generated new encryption key. Set VAULT_ENCRYPTION_KEY environment variable to persist it.")
-        
-        if len(self.master_key) != 32:
-            raise ValueError("Encryption key must be 32 bytes (256 bits)")
+        # Get or generate encryption key via loader
+        self.master_key = load_master_key(encryption_key)
         
         # Store current key in history
         self.key_history[self.key_version] = self.master_key

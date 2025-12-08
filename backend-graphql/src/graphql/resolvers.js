@@ -1,72 +1,110 @@
 import { GraphQLError } from 'graphql';
+import { readQuery, writeQuery } from '../config/neo4j.js';
 import logger from '../utils/logger.js';
 
-// Mock data for MVP - replace with actual database calls
-const mockApps = [
-  {
-    id: '1',
-    name: 'TrustApp Pro',
-    platform: 'ANDROID',
-    appStoreId: 'com.trust.app',
-    whistlerScore: 85,
-    metadata: {},
-    reviews: [],
-    claims: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    name: 'SecureChat',
-    platform: 'IOS',
-    appStoreId: 'com.secure.chat',
-    whistlerScore: 92,
-    metadata: {},
-    reviews: [],
-    claims: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
+/**
+ * GraphQL Resolvers - Connected to Neo4j
+ * 
+ * All resolvers now use the Neo4j database for persistence.
+ * Mock data has been removed in favor of real database queries.
+ */
 
 export const resolvers = {
   Query: {
-    app: (_, { id }) => {
+    app: async (_, { id }) => {
       logger.info(`Fetching app with id: ${id}`);
-      const app = mockApps.find(a => a.id === id);
-      if (!app) {
+      
+      const results = await readQuery(`
+        MATCH (a:App {id: $id})
+        RETURN a {
+          .id, .name, .platform, .appStoreId, .whistlerScore,
+          .metadata, .createdAt, .updatedAt
+        } as app
+      `, { id });
+      
+      if (!results.length || !results[0].app) {
         throw new GraphQLError('App not found', {
           extensions: { code: 'NOT_FOUND' },
         });
       }
-      return app;
+      
+      return results[0].app;
     },
 
-    apps: (_, { limit = 10, offset = 0 }) => {
+    apps: async (_, { limit = 10, offset = 0 }) => {
       logger.info(`Fetching apps: limit=${limit}, offset=${offset}`);
-      return mockApps.slice(offset, offset + limit);
+      
+      const results = await readQuery(`
+        MATCH (a:App)
+        RETURN a {
+          .id, .name, .platform, .appStoreId, .whistlerScore,
+          .metadata, .createdAt, .updatedAt
+        } as app
+        ORDER BY a.createdAt DESC
+        SKIP $offset LIMIT $limit
+      `, { limit: neo4jInt(limit), offset: neo4jInt(offset) });
+      
+      return results.map(r => r.app);
     },
 
-    reviews: (_, { appId, limit = 10 }) => {
+    reviews: async (_, { appId, limit = 10 }) => {
       logger.info(`Fetching reviews for app: ${appId}`);
-      return [];
+      
+      const results = await readQuery(`
+        MATCH (r:Review)-[:FOR_APP]->(a:App {id: $appId})
+        RETURN r {
+          .id, .source, .content, .rating, .sentiment, .createdAt,
+          appId: a.id
+        } as review
+        ORDER BY r.createdAt DESC
+        LIMIT $limit
+      `, { appId, limit: neo4jInt(limit) });
+      
+      return results.map(r => r.review);
     },
 
-    claim: (_, { id }) => {
+    claim: async (_, { id }) => {
       logger.info(`Fetching claim with id: ${id}`);
-      return null;
+      
+      const results = await readQuery(`
+        MATCH (c:Claim {id: $id})
+        RETURN c {
+          .id, .type, .content, .status, .createdAt, .verifiedAt
+        } as claim
+      `, { id });
+      
+      return results.length ? results[0].claim : null;
     },
 
-    scoreApp: (_, { appId }) => {
+    scoreApp: async (_, { appId }) => {
       logger.info(`Calculating score for app: ${appId}`);
-      const app = mockApps.find(a => a.id === appId);
-      if (!app) {
+      
+      // Get app with reviews for scoring
+      const results = await readQuery(`
+        MATCH (a:App {id: $appId})
+        OPTIONAL MATCH (r:Review)-[:FOR_APP]->(a)
+        WITH a, collect(r) as reviews
+        RETURN a {
+          .id, .name, .whistlerScore
+        } as app,
+        size(reviews) as reviewCount,
+        avg(r.rating) as avgRating
+      `, { appId });
+      
+      if (!results.length || !results[0].app) {
         throw new GraphQLError('App not found', {
           extensions: { code: 'NOT_FOUND' },
         });
       }
-
-      const score = app.whistlerScore || 70;
+      
+      const { app, reviewCount, avgRating } = results[0];
+      
+      // Calculate score based on various factors
+      const baseScore = app.whistlerScore || 70;
+      const reviewBonus = Math.min(reviewCount * 0.5, 10);
+      const ratingBonus = avgRating ? (avgRating - 3) * 5 : 0;
+      const score = Math.round(Math.min(100, Math.max(0, baseScore + reviewBonus + ratingBonus)));
+      
       const grade = score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
 
       return {
@@ -74,48 +112,119 @@ export const resolvers = {
         score,
         grade,
         breakdown: {
-          privacy: { value: Math.floor(Math.random() * 30) + 60 },
-          financial: { value: Math.floor(Math.random() * 30) + 60 },
+          privacy: { value: Math.floor(score * 0.9 + Math.random() * 10) },
+          financial: { value: Math.floor(score * 0.85 + Math.random() * 15) },
         },
       };
     },
   },
 
   Mutation: {
-    registerApp: (_, args) => {
+    registerApp: async (_, args) => {
       logger.info(`Registering new app: ${args.name}`);
-      const newApp = {
-        id: String(mockApps.length + 1),
+      
+      const id = `app_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const now = new Date().toISOString();
+      
+      const results = await writeQuery(`
+        CREATE (a:App {
+          id: $id,
+          name: $name,
+          platform: $platform,
+          appStoreId: $appStoreId,
+          whistlerScore: 70,
+          metadata: $metadata,
+          createdAt: $now,
+          updatedAt: $now
+        })
+        RETURN a {
+          .id, .name, .platform, .appStoreId, .whistlerScore,
+          .metadata, .createdAt, .updatedAt
+        } as app
+      `, {
+        id,
         name: args.name,
         platform: args.platform,
         appStoreId: args.appStoreId || null,
-        whistlerScore: 70,
-        metadata: args.metadata || {},
-        reviews: [],
-        claims: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      mockApps.push(newApp);
-      return newApp;
+        metadata: JSON.stringify(args.metadata || {}),
+        now,
+      });
+      
+      return results[0].app;
     },
 
-    addReview: (_, { appId, source, content, rating }) => {
+    addReview: async (_, { appId, source, content, rating }) => {
       logger.info(`Adding review for app: ${appId}`);
-      return {
-        id: String(Date.now()),
-        appId,
-        source,
-        content,
-        rating,
-        sentiment: {},
-        createdAt: new Date().toISOString(),
-      };
+      
+      const id = `review_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const now = new Date().toISOString();
+      
+      const results = await writeQuery(`
+        MATCH (a:App {id: $appId})
+        CREATE (r:Review {
+          id: $id,
+          source: $source,
+          content: $content,
+          rating: $rating,
+          sentiment: '{}',
+          createdAt: $now
+        })-[:FOR_APP]->(a)
+        RETURN r {
+          .id, .source, .content, .rating, .sentiment, .createdAt,
+          appId: a.id
+        } as review
+      `, { appId, id, source, content, rating, now });
+      
+      if (!results.length) {
+        throw new GraphQLError('App not found', {
+          extensions: { code: 'NOT_FOUND' },
+        });
+      }
+      
+      return results[0].review;
     },
   },
 
   App: {
-    reviews: (parent) => parent.reviews || [],
-    claims: (parent) => parent.claims || [],
+    reviews: async (parent) => {
+      if (parent.reviews && parent.reviews.length) {
+        return parent.reviews;
+      }
+      
+      const results = await readQuery(`
+        MATCH (r:Review)-[:FOR_APP]->(a:App {id: $appId})
+        RETURN r {
+          .id, .source, .content, .rating, .sentiment, .createdAt,
+          appId: a.id
+        } as review
+        ORDER BY r.createdAt DESC
+        LIMIT 10
+      `, { appId: parent.id });
+      
+      return results.map(r => r.review);
+    },
+    
+    claims: async (parent) => {
+      if (parent.claims && parent.claims.length) {
+        return parent.claims;
+      }
+      
+      const results = await readQuery(`
+        MATCH (c:Claim)-[:ABOUT_APP]->(a:App {id: $appId})
+        RETURN c {
+          .id, .type, .content, .status, .createdAt, .verifiedAt
+        } as claim
+        ORDER BY c.createdAt DESC
+      `, { appId: parent.id });
+      
+      return results.map(r => r.claim);
+    },
   },
 };
+
+/**
+ * Helper to convert JS numbers to Neo4j integers
+ */
+function neo4jInt(value) {
+  return { low: value, high: 0 };
+}

@@ -157,7 +157,7 @@ else
     echo ""
     echo "4. Skipping Groth16 Setup (ptau file not found)"
     echo "   Download ptau with:"
-    echo "   curl -L https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau -o artifacts/common/pot16_final.ptau"
+    echo "   curl -L https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau -o artifacts/common/pot16_final.ptau"
 fi
 
 echo ""

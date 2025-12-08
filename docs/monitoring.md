@@ -1,124 +1,56 @@
 # Monitoring Guide
+# Last updated: 2025-12-06
 
 Complete guide to monitoring, health checks, and observability in Honestly.
 
 ## 🎯 Overview
 
-Honestly provides comprehensive monitoring endpoints for:
-- Health checks
-- Performance metrics
-- Security events
-- System resources
+Honestly provides lightweight probes and Prometheus metrics:
+- Liveness: `GET /health/live`
+- Readiness: `GET /health/ready` (vkeys + Neo4j)
+- Metrics: `GET /metrics` (Prometheus format, if enabled)
 
 ## 🏥 Health Checks
 
-### Lightweight Health Check
+### Liveness
 
-**Endpoint**: `GET /health`
+**Endpoint**: `GET /health/live`
 
-Fast health check for load balancers and monitoring systems.
+Fast check for load balancers and k8s liveness.
 
 **Response**:
 ```json
-{
-  "status": "healthy"
-}
+{ "status": "ok" }
 ```
 
-**Response Time**: <0.05s
+### Readiness
+
+**Endpoint**: `GET /health/ready`
+
+Checks verification keys presence and Neo4j connectivity. Returns `503` if degraded.
 
 **Example**:
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8000/health/ready
 ```
 
-**Use Cases**:
-- Load balancer health checks
-- Kubernetes liveness probes
-- Quick status checks
+Response includes booleans for vkeys and Neo4j.
 
 ---
 
-### Comprehensive Health Check
+### Metrics (Prometheus)
 
-**Endpoint**: `GET /monitoring/health`
+**Endpoint**: `GET /metrics`
 
-Detailed health check with system metrics.
-
-**Response**:
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-12-19T10:00:00Z",
-  "system": {
-    "cpu_percent": 45.2,
-    "memory_percent": 62.5,
-    "disk_percent": 35.8
-  },
-  "services": {
-    "database": "healthy",
-    "cache": "redis"
-  },
-  "performance": {
-    "request_count": 12345,
-    "error_count": 5,
-    "avg_response_time": 0.125,
-    "p95_response_time": 0.250,
-    "p99_response_time": 0.450
-  }
-}
-```
-
-**Status Codes**:
-- `200`: Healthy
-- `503`: Unhealthy or degraded
-
-**Example**:
-```bash
-curl http://localhost:8000/monitoring/health
-```
-
-**Use Cases**:
-- Detailed monitoring dashboards
-- Alerting systems
-- Troubleshooting
+Scrape with Prometheus; import into Grafana. Includes app, request, and security counters (if enabled).
 
 ---
 
 ## 📊 Performance Metrics
 
-### Get Metrics
+### Security events
 
-**Endpoint**: `GET /monitoring/metrics`
-
-Get performance and system metrics.
-
-**Response**:
-```json
-{
-  "performance": {
-    "request_count": 12345,
-    "error_count": 5,
-    "avg_response_time": 0.125,
-    "p95_response_time": 0.250,
-    "p99_response_time": 0.450
-  },
-  "security_events_count": 12,
-  "timestamp": "2024-12-19T10:00:00Z"
-}
-```
-
-**Metrics Explained**:
-- `request_count`: Total requests processed
-- `error_count`: Total errors encountered
-- `avg_response_time`: Average response time in seconds
-- `p95_response_time`: 95th percentile response time
-- `p99_response_time`: 99th percentile response time
-
-**Example**:
-```bash
-curl http://localhost:8000/monitoring/metrics
-```
+If enabled, security events are emitted to structured logs (logger `security`). Tail logs or ship to your SIEM. The public endpoint for events is not exposed by default.
 
 ---
 

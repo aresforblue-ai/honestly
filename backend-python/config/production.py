@@ -51,9 +51,11 @@ class ProductionConfig:
     def validate(cls):
         """Validate configuration."""
         if cls.ENVIRONMENT == 'production':
-            if cls.JWT_SECRET == os.urandom(32).hex():
+            # Check if JWT_SECRET is set via environment variable
+            if not os.getenv('JWT_SECRET'):
                 raise ValueError("JWT_SECRET must be set in production")
-            if cls.AI_AGENT_SECRET == os.urandom(32).hex():
+            # Check if AI_AGENT_SECRET is set via environment variable
+            if not os.getenv('AI_AGENT_SECRET'):
                 raise ValueError("AI_AGENT_SECRET must be set in production")
             if cls.NEO4J_PASS == 'test':
                 raise ValueError("NEO4J_PASS must be changed in production")

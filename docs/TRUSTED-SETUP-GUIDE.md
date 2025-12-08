@@ -13,12 +13,15 @@ cd backend-python/zkp
 mkdir -p artifacts/common
 
 # Download Powers of Tau (16 depth - supports up to 2^16 = 65,536 constraints)
-curl -L https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_16.ptau \
+curl -L https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau \
   -o artifacts/common/pot16_final.ptau
 
 # Verify download integrity (optional but recommended)
 # Check file size: should be ~67MB
 ls -lh artifacts/common/pot16_final.ptau
+
+# If you hit WASM/Node heap limits when compiling/proving level3 circuits locally,
+# set a larger heap: export NODE_OPTIONS="--max-old-space-size=8192"
 ```
 
 ### Step 2: Generate Circuit-Specific Setup
