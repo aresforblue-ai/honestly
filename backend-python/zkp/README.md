@@ -120,6 +120,235 @@ node poseidon-hash.js --inputs 1,2,3
 echo '["0x01","0x02","0x03"]' | node poseidon-hash.js
 ```
 
+## ⚡ Circom Optimization Flags
+
+Level 3 verifiers (verifying level 2 proofs) explode constraints via pairing checks and Poseidon hashes. Use aggressive optimizations:
+
+```
+┌──────┬───────────────────────────────┬──────────────────────┬──────────────┐
+│ Flag │ Use Case                      │ Constraint Reduction │ Compile Time │
+├──────┼───────────────────────────────┼──────────────────────┼──────────────┤
+│ -O2  │ Production (required)         │ ~73% vs -O0          │ ~2x longer   │
+│ -O1  │ Development (if -O2 chokes)   │ ~40%                 │ ~1.5x        │
+│ -O0  │ Debug only                    │ None                 │ Fast         │
+└──────┴───────────────────────────────┴──────────────────────┴──────────────┘
+```
+
+**Always use `-O2` for production builds** (per ZCLS benchmarks on Groth16 rollups).
+
+### C++ Witness Generation (Required for Large Circuits)
+
+WASM witness gen OOMs on Level 3 circuits (1M+ constraints → 16-64GB RAM). Use C++ witness generator instead:
+
+```bash
+# Production build with C++ witness generator (recommended for Level 3)
+npx circom circuits/age_level3.circom \
+  --r1cs --sym -O2 \
+  --c \
+  -o artifacts/age_level3 \
+  -l node_modules
+
+# Compile the C++ witness generator
+cd artifacts/age_level3/age_level3_cpp
+make
+
+# Use C++ witness gen instead of WASM
+./age_level3 input.json witness.wtns
+```
+
+### Memory Settings
+
+For large circuits, crank Node heap and use parallel compilation:
+
+```bash
+# Set before compilation/proving
+export NODE_OPTIONS="--max-old-space-size=16384"  # 16GB heap
+
+# For extreme cases (recursive verifiers)
+export NODE_OPTIONS="--max-old-space-size=32768"  # 32GB heap
+
+# Parallel constraints (circom 2.1.6+)
+npx circom ... --parallel 4
+```
+
+### Full Production Build Stack
+
+```bash
+# Level 3 circuits - full optimization stack
+npx circom circuits/age_level3.circom \
+  --r1cs --sym -O2 \
+  --c \                              # C++ witness (no WASM OOM)
+  --parallel 4 \                     # Parallel compilation
+  -o artifacts/age_level3 \
+  -l node_modules
+
+# Compile C++ witness generator
+cd artifacts/age_level3/age_level3_cpp && make && cd ../../..
+
+# Development fallback (if -O2 is too slow)
+npx circom circuits/age_level3.circom --r1cs --wasm --sym -O1 -o artifacts/age_level3 -l node_modules
+```
+
+### Constraint Counts (with `-O2`)
+
+```
+┌─────────────────────┬────────────────┬──────────┬─────────────────────────────────┐
+│ Circuit             │ Raw Constraints│ With -O2 │ Notes                           │
+├─────────────────────┼────────────────┼──────────┼─────────────────────────────────┤
+│ age                 │ ~8K            │ ~3K      │ Simple, WASM OK                 │
+│ authenticity        │ ~12K           │ ~4K      │ Simple, WASM OK                 │
+│ age_level3          │ ~50K           │ ~14K     │ Use C++ witness                 │
+│ level3_inequality   │ ~45K           │ ~12K     │ Use C++ witness                 │
+│ Recursive verifier  │ 1M+            │ ~300K    │ C++ witness + 32GB heap required│
+└─────────────────────┴────────────────┴──────────┴─────────────────────────────────┘
+```
+
+**Quick Reference:**
+```bash
+# Memory settings by circuit type
+export NODE_OPTIONS="--max-old-space-size=4096"   # Simple (age, auth)
+export NODE_OPTIONS="--max-old-space-size=16384"  # Level 3
+export NODE_OPTIONS="--max-old-space-size=32768"  # Recursive verifiers
+```
+
+---
+
+## 🔄 CI/CD Pipeline
+
+GitHub Actions workflow (`.github/workflows/zkp.yml`) handles automated builds:
+
+**Triggers:**
+- Push to `main`/`develop` (circuit changes only)
+- Weekly schedule (Sunday 2am UTC) - integrity audit
+- Manual dispatch with `[rebuild-level3]` commit message
+
+**Jobs:**
+
+```
+┌─────────────────────┬─────────────────┬──────────────────────────────────┐
+│ Job                 │ Runner          │ Circuits                         │
+├─────────────────────┼─────────────────┼──────────────────────────────────┤
+│ simple-circuits     │ ubuntu-latest   │ age, authenticity (WASM, -O2)    │
+│ level3-circuits     │ ubuntu-latest   │ age_level3, level3_inequality    │
+│                     │ + 16GB swap     │ (C++ witness, -O2)               │
+│ verify-integrity    │ ubuntu-latest   │ SHA256 hash check + tests        │
+│ weekly-audit        │ ubuntu-latest   │ Compare with INTEGRITY.json      │
+└─────────────────────┴─────────────────┴──────────────────────────────────┘
+```
+
+**Triggering Level 3 rebuilds:**
+
+```bash
+# Option 1: Commit message trigger
+git commit -m "Update circuits [rebuild-level3]"
+
+# Option 2: Manual dispatch (Actions tab)
+# Check "Rebuild Level 3 circuits" checkbox
+
+# Option 3: Automatic on schedule (weekly)
+```
+
+**Artifact retention:** 30 days (download from Actions tab)
+
+### Self-Hosted Runners (Recommended for Level 3)
+
+The swap workaround on `ubuntu-latest` works but is slow (~3x longer). For production CI:
+
+**1. Set up a self-hosted runner with 16GB+ RAM:**
+
+```bash
+# On your runner machine (Ubuntu 22.04 recommended)
+mkdir actions-runner && cd actions-runner
+curl -o actions-runner-linux-x64.tar.gz -L https://github.com/actions/runner/releases/download/v2.311.0/actions-runner-linux-x64-2.311.0.tar.gz
+tar xzf ./actions-runner-linux-x64.tar.gz
+./config.sh --url https://github.com/YOUR_ORG/honestly --token YOUR_TOKEN --labels self-hosted,linux,x64,16gb
+./run.sh
+```
+
+**2. Update workflow to use self-hosted:**
+
+```yaml
+# .github/workflows/zkp.yml
+level3-circuits:
+  runs-on: [self-hosted, linux, x64, 16gb]  # Use beefy runner
+  env:
+    NODE_OPTIONS: "--max-old-space-size=14336"
+```
+
+**3. Runner requirements:**
+
+```
+┌─────────────────────┬─────────────────────────────────────────────────┐
+│ Component           │ Requirement                                     │
+├─────────────────────┼─────────────────────────────────────────────────┤
+│ RAM                 │ 16GB+ (32GB for recursive verifiers)            │
+│ CPU                 │ 4+ cores                                        │
+│ Disk                │ 20GB+ free                                      │
+│ OS                  │ Ubuntu 22.04 LTS                                │
+│ Dependencies        │ Node 20, Rust, build-essential, libgmp-dev      │
+└─────────────────────┴─────────────────────────────────────────────────┘
+```
+
+**4. GitHub-hosted alternatives:**
+
+| Runner | RAM | Cost | Notes |
+|--------|-----|------|-------|
+| `ubuntu-latest` | 7GB | Free | Use swap workaround |
+| `ubuntu-latest-4-cores` | 16GB | Teams/Enterprise | Good for Level 3 |
+| `ubuntu-latest-16-cores` | 64GB | Teams/Enterprise | Recursive verifiers |
+
+---
+
+## 🐳 Docker Build
+
+Multi-stage Dockerfile for C++ witness generators (builds native, copies to slim runtime):
+
+```bash
+# Build ZKP image with all circuits
+docker build -f docker/Dockerfile.zkp -t honestly-zkp .
+
+# Run with resource limits (Level 3 circuits)
+docker run --rm \
+  --memory=16g \
+  --cpus=4 \
+  -v zkp_artifacts:/zkp/artifacts \
+  honestly-zkp
+
+# Or use docker-compose (recommended)
+docker-compose up zkp
+```
+
+**docker-compose.yml resource limits:**
+
+```yaml
+zkp:
+  deploy:
+    resources:
+      limits:
+        memory: 16G    # Level 3 circuits need this
+        cpus: '4'
+      reservations:
+        memory: 8G
+        cpus: '2'
+  environment:
+    - NODE_OPTIONS=--max-old-space-size=16384
+```
+
+**Resource requirements by build type:**
+
+```
+┌─────────────────────┬──────────┬──────┬─────────────────────────────────┐
+│ Build Type          │ Memory   │ CPUs │ Notes                           │
+├─────────────────────┼──────────┼──────┼─────────────────────────────────┤
+│ Simple circuits     │ 4G       │ 2    │ age, authenticity (WASM)        │
+│ Level 3 circuits    │ 16G      │ 4    │ C++ witness, -O2                │
+│ Recursive verifiers │ 32G      │ 8    │ C++ witness, -O2, --parallel    │
+│ Runtime (API)       │ 8G       │ 2    │ Proving only (pre-built zkeys)  │
+└─────────────────────┴──────────┴──────┴─────────────────────────────────┘
+```
+
+---
+
 ## Notes
 
 - Circuits use Poseidon for constraint efficiency.

@@ -66,10 +66,11 @@ We actively support the latest version and provide security updates as needed.
 - Redis: ≥5.0.0
 
 **ZK-SNARK Stack**:
-- Circom: 2.1.6
+- Circom: 2.1.6 (with `-O2` optimization for production)
 - snarkjs: 0.7.3
 - circomlibjs: 0.0.8
 - Powers of Tau: 16 (final)
+- Level 3 circuits: `-O2` mandatory (73% constraint reduction)
 
 **Frontend**:
 - React: 18.2.0
@@ -207,6 +208,43 @@ All security events are logged and available via:
 - Monitor GitHub releases
 - Review changelog for security fixes
 - Keep dependencies updated
+
+## 🔐 ZK Circuit Security
+
+### Circuit Optimization
+
+Level 3 verifiers explode constraints via pairing checks and Poseidon hashes. **Always use aggressive optimizations:**
+
+| Flag | Use Case | Constraint Reduction |
+|------|----------|---------------------|
+| `-O2` | **Production (required)** | ~73% vs `-O0` |
+| `-O1` | Development fallback | ~40% |
+
+### Trusted Setup
+
+- Powers of Tau ceremony completed (phase 1)
+- Circuit-specific phase 2 contributions required
+- Verification key hashes stored in `INTEGRITY.json`
+- ETag/SHA256 integrity checking on all served artifacts
+
+### Nullifier Security
+
+- All proofs generate unique nullifiers
+- Nullifiers tracked in Redis to prevent replay attacks
+- Nullifier derivation: `Poseidon(secret, scope, timestamp)`
+
+### Audit Status
+
+| Circuit | Audited | Notes |
+|---------|---------|-------|
+| age | ✅ Internal | Ready for external audit |
+| authenticity | ✅ Internal | Ready for external audit |
+| age_level3 | ✅ Internal | Uses `-O2` optimization |
+| level3_inequality | ✅ Internal | Uses `-O2` optimization |
+| agent_capability | 🟡 New | AAIP circuit |
+| agent_reputation | 🟡 New | AAIP circuit |
+
+---
 
 ## 📚 Security Resources
 

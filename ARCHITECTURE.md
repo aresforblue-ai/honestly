@@ -1,7 +1,14 @@
 # Honestly - System Architecture
-# Last updated: 2025-12-06
+**Last Updated**: December 2024
 
-This document describes the complete architecture of the Honestly Truth Engine platform.
+This document describes the complete architecture of the Honestly Truth Engine platform, including the AI Agent Identity Protocol (AAIP).
+
+## 🆕 What's New
+
+- **AI Agent Identity Protocol (AAIP)** — Verifiable identities for AI agents
+- **Real ZK Proofs** — Groth16 with nullifier tracking
+- **Cross-Chain Identity** — Bridge identities across blockchains
+- **Social Recovery** — Shamir's Secret Sharing for key recovery
 
 ## 🏛️ High-Level Overview
 
@@ -550,6 +557,70 @@ log_security_event(
 
 **Current**: Request ID tracking via `X-Request-ID` header  
 **Future**: OpenTelemetry for distributed tracing
+
+## 🤖 AI Agent Identity Protocol (AAIP)
+
+AAIP is a first-of-its-kind protocol for verifiable AI agent identities.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      AAIP LAYER                              │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
+│  │  Agent Registry │  │  ZK Prover      │  │  Nullifier  │ │
+│  │                 │  │                 │  │  Tracker    │ │
+│  │  • DID Format   │  │  • Groth16      │  │             │ │
+│  │  • Capabilities │  │  • Level3       │  │  • Redis    │ │
+│  │  • Constraints  │  │  • Reputation   │  │  • Replay   │ │
+│  │  • Public Keys  │  │                 │  │    Prevent  │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────┘ │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │                   Trust Bridge                          ││
+│  │  • Agent-to-Agent Trust    • Capability Verification    ││
+│  │  • Reputation Proofs       • ECDSA Signatures           ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key Components
+
+1. **Agent Registry**: Stores agent identities with W3C DID format
+2. **ZK Prover**: Generates Groth16 proofs for reputation thresholds
+3. **Nullifier Tracker**: Prevents replay attacks on proofs
+4. **Trust Bridge**: Enables agent-to-agent trust verification
+
+### DID Format
+
+```
+did:honestly:agent:{agent_id}
+```
+
+Example: `did:honestly:agent:claude-3-opus-anthropic-abc123`
+
+### Usage Example
+
+```python
+from identity import register_ai_agent, get_agent_reputation
+
+# Register an AI agent
+agent = register_ai_agent(
+    name="claude-3-opus",
+    operator_id="anthropic",
+    capabilities=["text_generation", "reasoning"],
+    constraints=["audit_logged"],
+    public_key="-----BEGIN PUBLIC KEY-----\n..."
+)
+
+# Generate ZK proof of reputation
+rep = get_agent_reputation(agent["agent_id"], threshold=40)
+# Returns: proof, nullifier, zk_verified
+```
+
+---
 
 ## 🔮 Future Enhancements
 

@@ -42,7 +42,7 @@ python --version      # Need 3.10+
 
 ```bash
 # Clone the repo
-git clone https://github.com/proof-of-human/honestly.git
+git clone https://github.com/aresforblue-ai/honestly.git
 cd honestly
 
 # Install Python dependencies
@@ -282,7 +282,7 @@ Did you complete this guide in under 30 minutes?
 
 - ✅ Yes → Great! The docs are working.
 - ❌ No → Please tell us what took longer:
-  - Open an issue: https://github.com/proof-of-human/honestly/issues
+  - Open an issue: https://github.com/aresforblue-ai/honestly/issues
   - Include: Which step, how long it took, what was confusing
 
 Your feedback makes this better for everyone. Thank you! 🙏
@@ -292,7 +292,7 @@ Your feedback makes this better for everyone. Thank you! 🙏
 ## 🆘 Need Help?
 
 - **Discord**: [Join our server](#) (TODO: Add link)
-- **GitHub Issues**: https://github.com/proof-of-human/honestly/issues
+- **GitHub Issues**: https://github.com/aresforblue-ai/honestly/issues
 - **Email**: support@proof-of-human.org (TODO: Set up)
 
 ---

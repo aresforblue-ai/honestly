@@ -128,6 +128,36 @@ Once all services are running:
 - `make zkp-build` — builds circuits, zkeys, and exports verification keys (requires circom/snarkjs locally).
 - `make zkp-verify` — generates and verifies sample proofs using the sample inputs.
 
+### ZK Circuit Optimization (Important!)
+
+Level 3 circuits use `-O2` optimization + C++ witness generation to avoid WASM OOM:
+
+```bash
+# Production builds (C++ witness, -O2 optimization)
+npm run build:age-level3           # Outputs C++ witness generator
+npm run compile:age-level3:cpp     # Compile the C++ witness gen
+
+# Development builds (WASM, if -O1 is OK)
+npm run build:age-level3:dev       # Uses -O1, WASM
+
+# Full optimization for large circuits
+export NODE_OPTIONS="--max-old-space-size=16384"  # 16GB heap
+npm run build:age-level3
+npm run compile:age-level3:cpp
+```
+
+**Constraint counts (with `-O2`)**:
+| Circuit | Raw | Optimized |
+|---------|-----|-----------|
+| `age_level3` | ~50K | ~14K |
+| `level3_inequality` | ~45K | ~12K |
+| Recursive verifier | 1M+ | ~300K |
+
+**Memory requirements**:
+- Simple circuits (age, authenticity): 4GB heap, WASM OK
+- Level 3 circuits: 16GB heap, C++ witness recommended
+- Recursive verifiers: 32GB heap, C++ witness required
+
 ## 🔧 Detailed Setup Instructions
 
 ### Frontend Application Setup

@@ -13,12 +13,20 @@ services:
       - DISABLE_KAFKA=true
       - DISABLE_FAISS=true
       - DISABLE_FABRIC=true
+      - NODE_OPTIONS=--max-old-space-size=4096
     ports:
       - "8000:8000"
     depends_on:
       - neo4j
     networks:
       - honestly-min
+    # Resource limits for API (simple circuits only)
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
 
   neo4j:
     image: neo4j:5.13
