@@ -29,6 +29,7 @@ from .autoencoder import (
     AnomalyResult,
 )
 from .zkml_prover import ZKMLProver, get_zkml_prover, ZKMLProof
+from .deepprove_integration import DeepProveZKML, get_deepprove_zkml, DeepProveProof
 from .neo4j_loader import Neo4jDataLoader, create_training_dataset
 
 __all__ = [
@@ -46,6 +47,10 @@ __all__ = [
     "ZKMLProver",
     "get_zkml_prover",
     "ZKMLProof",
+    # DeepProve zkML
+    "DeepProveZKML",
+    "get_deepprove_zkml",
+    "DeepProveProof",
     # Data loading
     "Neo4jDataLoader",
     "create_training_dataset",

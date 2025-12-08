@@ -65,6 +65,7 @@ try:
     from ml.anomaly_detector import get_detector
     from ml.neo4j_loader import Neo4jDataLoader
     from ml.zkml_prover import get_zkml_prover
+    from ml.deepprove_integration import get_deepprove_zkml
     ML_AVAILABLE = True
 except ImportError as e:
     ML_AVAILABLE = False
@@ -161,6 +162,14 @@ class TrainModelRequest(BaseModel):
     batch_size: int = Field(default=32, ge=8, le=128)
     days: int = Field(default=30, ge=7, le=90)
     min_samples: int = Field(default=500, ge=100, le=10000)
+
+
+class ZKMLProofRequest(BaseModel):
+    """Request for zkML proof generation."""
+    agent_id: str = Field(..., min_length=1, max_length=200)
+    threshold: float = Field(default=0.8, ge=0.0, le=1.0)
+    use_rapidsnark: bool = Field(default=True, description="Use Rapidsnark for faster proving")
+    include_sequence_commitment: bool = Field(default=False)
 
 
 class AnomalyResult(BaseModel):
@@ -625,6 +634,240 @@ async def kafka_health():
     except Exception as e:
         return {
             "status": "error",
+            "error": str(e),
+        }
+
+
+# ============================================================================
+# zkML Endpoints - Zero-Knowledge Machine Learning Proofs
+# ============================================================================
+
+@router.post("/zkml/prove")
+async def generate_zkml_proof(request: ZKMLProofRequest):
+    """
+    Generate a zkML proof of anomaly detection result.
+    
+    Uses DeepProve to prove "reconstruction_error > threshold"
+    without revealing:
+    - Agent activity features
+    - Model weights
+    - Raw anomaly score
+    
+    Only reveals:
+    - Threshold used
+    - Boolean: is_above_threshold
+    - Model commitment (hash)
+    
+    Output is Groth16-compatible for on-chain verification.
+    """
+    if not ML_AVAILABLE:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ML modules not available",
+        )
+    
+    start_time = time.perf_counter()
+    
+    # Fetch agent features
+    features = fetch_agent_features(request.agent_id)
+    
+    # Generate zkML proof
+    try:
+        zkml = get_deepprove_zkml()
+        proof = zkml.prove_anomaly(
+            features=features,
+            threshold=request.threshold,
+            use_rapidsnark=request.use_rapidsnark,
+        )
+        
+        total_time = (time.perf_counter() - start_time) * 1000
+        
+        # Publish to Kafka if anomalous
+        kafka_event_id = None
+        if proof.is_above_threshold:
+            event = {
+                "agent_id": request.agent_id,
+                "threshold": request.threshold,
+                "is_anomalous": True,
+                "proof_generated": True,
+                "model_commitment": proof.model_commitment[:16],
+                "action": "zkml_verified_anomaly",
+            }
+            kafka_event_id = await publish_kafka_event(
+                topic=KAFKA_TOPIC_ANOMALY,
+                key=f"zkml:{request.agent_id}",
+                event=event,
+            )
+        
+        return {
+            "agent_id": request.agent_id,
+            "proof": proof.to_dict(),
+            "is_above_threshold": proof.is_above_threshold,
+            "total_time_ms": round(total_time, 2),
+            "kafka_event_id": kafka_event_id,
+            "verification_command": (
+                f"npx snarkjs groth16 verify "
+                f"circuits/zkml/verification_key.json "
+                f"public.json proof.json"
+            ),
+        }
+        
+    except Exception as e:
+        logger.error(f"zkML proof generation failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Proof generation failed: {str(e)}",
+        )
+
+
+@router.post("/zkml/verify")
+async def verify_zkml_proof(proof_data: Dict[str, Any]):
+    """
+    Verify a zkML proof.
+    
+    Accepts a proof in snarkjs/Groth16 format and verifies it
+    against the circuit's verification key.
+    """
+    if not ML_AVAILABLE:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ML modules not available",
+        )
+    
+    try:
+        from ml.deepprove_integration import DeepProveProof
+        
+        # Reconstruct proof object
+        proof_obj = proof_data.get("proof", {})
+        proof = DeepProveProof(
+            pi_a=proof_obj.get("pi_a", []),
+            pi_b=proof_obj.get("pi_b", []),
+            pi_c=proof_obj.get("pi_c", []),
+            public_inputs=proof_data.get("publicInputs", []),
+            model_commitment=proof_data.get("metadata", {}).get("model_commitment", ""),
+            threshold_scaled=proof_data.get("metadata", {}).get("threshold_scaled", 0),
+            is_above_threshold=proof_data.get("metadata", {}).get("is_above_threshold", False),
+        )
+        
+        # Verify
+        zkml = get_deepprove_zkml()
+        is_valid = zkml.verify(proof)
+        
+        return {
+            "valid": is_valid,
+            "public_inputs": proof.public_inputs,
+            "model_commitment": proof.model_commitment[:16] if proof.model_commitment else None,
+        }
+        
+    except Exception as e:
+        logger.error(f"zkML verification failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Verification failed: {str(e)}",
+        )
+
+
+@router.post("/zkml/setup")
+async def setup_zkml_circuit(
+    onnx_path: str = "models/autoencoder.onnx",
+    background_tasks: BackgroundTasks = None,
+):
+    """
+    Setup zkML circuit from ONNX model.
+    
+    One-time setup that compiles the model to a ZK circuit
+    and generates proving/verification keys.
+    
+    This is a long-running operation (~5-10 minutes for complex models).
+    """
+    if not ML_AVAILABLE:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ML modules not available",
+        )
+    
+    from pathlib import Path
+    
+    model_path = Path(onnx_path)
+    if not model_path.exists():
+        # Try to export current autoencoder
+        try:
+            autoencoder = get_autoencoder()
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+            autoencoder.export_onnx(model_path)
+            logger.info(f"Exported autoencoder to {model_path}")
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Model not found and export failed: {e}",
+            )
+    
+    async def setup_task():
+        """Background setup task."""
+        try:
+            zkml = get_deepprove_zkml()
+            success = zkml.setup(model_path, optimize=True)
+            
+            event = {
+                "status": "completed" if success else "failed",
+                "model_path": str(model_path),
+                "circuit_stats": zkml.get_circuit_stats(),
+            }
+            await publish_kafka_event(
+                topic=KAFKA_TOPIC_MODEL,
+                key="zkml_setup",
+                event=event,
+            )
+        except Exception as e:
+            logger.error(f"zkML setup failed: {e}")
+            await publish_kafka_event(
+                topic=KAFKA_TOPIC_MODEL,
+                key="zkml_setup",
+                event={"status": "failed", "error": str(e)},
+            )
+    
+    if background_tasks:
+        background_tasks.add_task(setup_task)
+        return {
+            "status": "setup_started",
+            "model_path": str(model_path),
+            "note": "This may take 5-10 minutes. Check Kafka for completion.",
+        }
+    else:
+        # Run synchronously (for testing)
+        zkml = get_deepprove_zkml()
+        success = zkml.setup(model_path, optimize=True)
+        return {
+            "status": "completed" if success else "failed",
+            "circuit_stats": zkml.get_circuit_stats(),
+        }
+
+
+@router.get("/zkml/status")
+async def zkml_status():
+    """Get zkML circuit status and statistics."""
+    if not ML_AVAILABLE:
+        return {
+            "available": False,
+            "reason": "ML modules not available",
+        }
+    
+    try:
+        zkml = get_deepprove_zkml()
+        stats = zkml.get_circuit_stats()
+        
+        return {
+            "available": True,
+            "stats": stats,
+            "endpoints": {
+                "prove": "/ai/zkml/prove",
+                "verify": "/ai/zkml/verify",
+                "setup": "/ai/zkml/setup",
+            },
+        }
+    except Exception as e:
+        return {
+            "available": False,
             "error": str(e),
         }
 
