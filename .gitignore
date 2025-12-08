@@ -24,6 +24,7 @@ yarn-error.log*
 *.swp
 *.swo
 *~
+*.bak
 
 # OS
 .DS_Store

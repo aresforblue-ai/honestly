@@ -35,7 +35,7 @@ cd backend-python && pip install -r requirements.txt
 
 ### Running Services
 ```bash
-make up                     # Start Docker infrastructure (Note: Makefile references docker-compose-updated.yml, may need to use docker-compose.yml)
+make up                     # Start Docker infrastructure
 make dev-frontend           # Start React dev server (port 3000)
 make dev-backend-gql        # Start GraphQL server (port 4000)
 make dev-backend-py         # Start Python API (port 8000)
