@@ -21,5 +21,6 @@ torch>=2.0.0  # Optional: for LSTM autoencoder (fallback to statistical methods 
 # Testing dependencies
 pytest>=7.4.0
 pytest-cov>=4.1.0
+httpx>=0.24.0  # Required for FastAPI TestClient
 # Note: For production ZK proofs, consider zkpy or circom integration
 # Note: For production Fabric SDK, use fabric-sdk-py or hfc
