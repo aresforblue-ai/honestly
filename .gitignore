@@ -33,6 +33,7 @@ Thumbs.db
 frontend-app/dist/
 backend-graphql/dist/
 *.tsbuildinfo
+.next/
 
 # Database
 *.db
