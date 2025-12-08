@@ -363,6 +363,6 @@ See [LICENSE](LICENSE) for full terms.
 
 **Built with ❤️ for privacy, security, and trust.**
 
-[⭐ Star on GitHub](https://github.com/honestly-labs/honestly) • [🐛 Report Bug](https://github.com/honestly-labs/honestly/issues) • [💡 Request Feature](https://github.com/honestly-labs/honestly/issues)
+[⭐ Star on GitHub](https://github.com/aresforblue-ai/honestly) • [🐛 Report Bug](https://github.com/aresforblue-ai/honestly/issues) • [💡 Request Feature](https://github.com/aresforblue-ai/honestly/issues)
 
 </div>
