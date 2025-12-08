@@ -41,6 +41,20 @@ except ImportError:
     ML_ROUTER_AVAILABLE = False
     ml_router = None
 
+try:
+    from api.websocket_router import router as ws_router
+    WS_ROUTER_AVAILABLE = True
+except ImportError:
+    WS_ROUTER_AVAILABLE = False
+    ws_router = None
+
+try:
+    from api.alerts import get_alert_service
+    ALERTS_AVAILABLE = True
+except ImportError:
+    ALERTS_AVAILABLE = False
+    get_alert_service = None
+
 # Import Prometheus metrics
 try:
     from api.prometheus import get_metrics_endpoint
@@ -410,6 +424,10 @@ if AI_AGENTS_AVAILABLE and ai_agents_router:
 # Mount ML anomaly detection routes
 if ML_ROUTER_AVAILABLE and ml_router:
     app.include_router(ml_router)
+
+# Mount WebSocket routes for real-time anomaly streaming
+if WS_ROUTER_AVAILABLE and ws_router:
+    app.include_router(ws_router)
 
 # Prometheus metrics endpoint
 if PROMETHEUS_AVAILABLE:

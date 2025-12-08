@@ -71,6 +71,23 @@ except ImportError as e:
     ML_AVAILABLE = False
     logger.warning(f"ML modules not available: {e}")
 
+# Alert service for Slack/Discord
+try:
+    from api.alerts import get_alert_service, alert_on_anomaly
+    ALERTS_AVAILABLE = True
+except ImportError:
+    ALERTS_AVAILABLE = False
+    async def alert_on_anomaly(anomaly):
+        return {"slack": False, "discord": False, "reason": "not_available"}
+
+# WebSocket manager for real-time streaming
+try:
+    from api.websocket_router import get_connection_manager
+    WS_AVAILABLE = True
+except ImportError:
+    WS_AVAILABLE = False
+    get_connection_manager = None
+
 # Try to import Neo4j
 try:
     from py2neo import Graph
@@ -392,6 +409,15 @@ async def detect_anomaly(
             event=event,
         )
         result["kafka_event_id"] = event_id
+        
+        # Send Slack/Discord alerts
+        if ALERTS_AVAILABLE:
+            background_tasks.add_task(alert_on_anomaly, event)
+        
+        # Broadcast to WebSocket clients
+        if WS_AVAILABLE and get_connection_manager:
+            ws_manager = get_connection_manager()
+            background_tasks.add_task(ws_manager.broadcast_anomaly, event)
         
         logger.warning(
             f"ANOMALY DETECTED: agent={request.agent_id} "
