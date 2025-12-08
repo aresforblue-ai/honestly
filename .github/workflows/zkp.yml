@@ -1,0 +1,525 @@
+name: ZK Circuit Rebuild and Verification
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend-python/zkp/circuits/**'
+      - 'backend-python/zkp/scripts/**'
+      - 'backend-python/zkp/package.json'
+      - 'backend-python/zkp/poseidon-hash.js'
+      - 'backend-python/zkp/snark-runner.js'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend-python/zkp/circuits/**'
+      - 'backend-python/zkp/scripts/**'
+      - 'backend-python/zkp/package.json'
+  # Weekly integrity check (Sunday 2am UTC)
+  schedule:
+    - cron: '0 2 * * 0'
+  # Manual trigger for full rebuild
+  workflow_dispatch:
+    inputs:
+      rebuild_level3:
+        description: 'Rebuild Level 3 circuits (requires large runner)'
+        required: false
+        default: 'false'
+        type: boolean
+      rebuild_all:
+        description: 'Full rebuild (all circuits + integrity check)'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  ZK_TESTS: "1"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  # ===========================================================================
+  # Job 1: Simple Circuits (age, authenticity) - Standard runner OK
+  # ===========================================================================
+  simple-circuits:
+    name: Build Simple Circuits
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: "--max-old-space-size=4096"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Cache node_modules
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: backend-python/zkp/node_modules
+          key: ${{ runner.os }}-zkp-node-${{ hashFiles('backend-python/zkp/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-zkp-node-
+
+      # Cache Powers of Tau
+      - name: Prepare ptau path
+        run: mkdir -p backend-python/zkp/artifacts/common
+
+      - name: Cache ptau
+        uses: actions/cache@v4
+        with:
+          path: backend-python/zkp/artifacts/common/pot16_final.ptau
+          key: ptau-v16-final
+
+      - name: Install Circom (binary)
+        run: |
+          curl -sSL https://github.com/iden3/circom/releases/download/v2.1.6/circom-linux-amd64 -o /usr/local/bin/circom
+          chmod +x /usr/local/bin/circom
+          circom --version
+
+      - name: Install npm dependencies
+        run: |
+          cd backend-python/zkp
+          npm ci
+
+      - name: Download ptau if missing
+        run: |
+          if [ ! -f backend-python/zkp/artifacts/common/pot16_final.ptau ]; then
+            echo "Downloading Powers of Tau (phase 1)..."
+            curl -L --fail --retry 3 \
+              https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau \
+              -o backend-python/zkp/artifacts/common/pot16_final.ptau
+          fi
+          ls -lh backend-python/zkp/artifacts/common/
+
+      # Build simple circuits with -O2
+      - name: Build age circuit
+        run: |
+          cd backend-python/zkp
+          circom circuits/age.circom --r1cs --wasm --sym -O2 -o artifacts/age -l node_modules
+          echo "✅ age.r1cs constraint count:"
+          npx snarkjs r1cs info artifacts/age/age.r1cs
+
+      - name: Build authenticity circuit
+        run: |
+          cd backend-python/zkp
+          circom circuits/authenticity.circom --r1cs --wasm --sym -O2 -o artifacts/authenticity -l node_modules
+          echo "✅ authenticity.r1cs constraint count:"
+          npx snarkjs r1cs info artifacts/authenticity/authenticity.r1cs
+
+      # Groth16 setup
+      - name: Setup age (Groth16)
+        run: |
+          cd backend-python/zkp
+          npx snarkjs groth16 setup artifacts/age/age.r1cs artifacts/common/pot16_final.ptau artifacts/age/age_0000.zkey
+          npx snarkjs zkey contribute artifacts/age/age_0000.zkey artifacts/age/age_final.zkey -n "ci-${{ github.sha }}" -e="$(head -c 64 /dev/urandom | xxd -p)"
+          npx snarkjs zkey export verificationkey artifacts/age/age_final.zkey artifacts/age/verification_key.json
+
+      - name: Setup authenticity (Groth16)
+        run: |
+          cd backend-python/zkp
+          npx snarkjs groth16 setup artifacts/authenticity/authenticity.r1cs artifacts/common/pot16_final.ptau artifacts/authenticity/authenticity_0000.zkey
+          npx snarkjs zkey contribute artifacts/authenticity/authenticity_0000.zkey artifacts/authenticity/authenticity_final.zkey -n "ci-${{ github.sha }}" -e="$(head -c 64 /dev/urandom | xxd -p)"
+          npx snarkjs zkey export verificationkey artifacts/authenticity/authenticity_final.zkey artifacts/authenticity/verification_key.json
+
+      - name: Upload simple circuit artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zkp-simple-artifacts
+          path: |
+            backend-python/zkp/artifacts/age/
+            backend-python/zkp/artifacts/authenticity/
+          retention-days: 30
+
+  # ===========================================================================
+  # Job 2: Level 3 Circuits - Large runner required (16GB+ RAM)
+  # ===========================================================================
+  level3-circuits:
+    name: Build Level 3 Circuits
+    # Use large runner for Level 3 (ubuntu-latest only has 7GB)
+    # Options: 'ubuntu-latest-16-cores' (GitHub Teams/Enterprise)
+    #          'self-hosted' with 16GB+ RAM
+    #          'ubuntu-latest' with swap (slower but works)
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' && (inputs.rebuild_level3 == 'true' || inputs.rebuild_all == 'true') ||
+      contains(github.event.head_commit.message, '[rebuild-level3]')
+    env:
+      NODE_OPTIONS: "--max-old-space-size=14336"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Add swap for ubuntu-latest (only 7GB RAM)
+      - name: Setup swap space
+        run: |
+          sudo fallocate -l 16G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          sudo swapon --show
+          free -h
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Install C++ build tools for witness generator + rapidsnark
+      - name: Install C++ toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake nlohmann-json3-dev libgmp-dev libsodium-dev nasm
+
+      # Install rapidsnark for fast proving
+      - name: Cache rapidsnark
+        id: cache-rapidsnark
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/rapidsnark
+          key: rapidsnark-${{ runner.os }}-v1
+
+      - name: Build and install rapidsnark
+        if: steps.cache-rapidsnark.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/iden3/rapidsnark.git /tmp/rapidsnark
+          cd /tmp/rapidsnark
+          git submodule init && git submodule update
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+          sudo cp prover /usr/local/bin/rapidsnark
+          rm -rf /tmp/rapidsnark
+          rapidsnark --version || echo "Rapidsnark installed"
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: backend-python/zkp/node_modules
+          key: ${{ runner.os }}-zkp-node-${{ hashFiles('backend-python/zkp/package-lock.json') }}
+
+      - name: Prepare ptau path
+        run: mkdir -p backend-python/zkp/artifacts/common
+
+      - name: Cache ptau
+        uses: actions/cache@v4
+        with:
+          path: backend-python/zkp/artifacts/common/pot16_final.ptau
+          key: ptau-v16-final
+
+      # Install Circom from source (for --c flag support)
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache Circom binary
+        id: cache-circom
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/circom
+          key: circom-2.1.6-${{ runner.os }}
+
+      - name: Install Circom from source
+        if: steps.cache-circom.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/iden3/circom.git /tmp/circom
+          cd /tmp/circom
+          cargo build --release
+          cargo install --path circom
+          circom --version
+
+      - name: Install npm dependencies
+        run: |
+          cd backend-python/zkp
+          npm ci
+
+      - name: Download ptau if missing
+        run: |
+          if [ ! -f backend-python/zkp/artifacts/common/pot16_final.ptau ]; then
+            curl -L --fail --retry 3 \
+              https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau \
+              -o backend-python/zkp/artifacts/common/pot16_final.ptau
+          fi
+
+      # Build Level 3 circuits with -O2 + C++ witness
+      - name: Build age_level3 circuit (C++ witness)
+        run: |
+          cd backend-python/zkp
+          mkdir -p artifacts/age_level3
+          ~/.cargo/bin/circom circuits/age_level3.circom \
+            --r1cs --sym -O2 --c \
+            -o artifacts/age_level3 \
+            -l node_modules
+          echo "✅ age_level3.r1cs constraint count:"
+          npx snarkjs r1cs info artifacts/age_level3/age_level3.r1cs
+          # Compile C++ witness generator
+          cd artifacts/age_level3/age_level3_cpp
+          make
+          ls -lh
+
+      - name: Build level3_inequality circuit (C++ witness)
+        run: |
+          cd backend-python/zkp
+          mkdir -p artifacts/level3_inequality
+          ~/.cargo/bin/circom circuits/Level3Inequality.circom \
+            --r1cs --sym -O2 --c \
+            -o artifacts/level3_inequality \
+            -l node_modules
+          echo "✅ Level3Inequality.r1cs constraint count:"
+          npx snarkjs r1cs info artifacts/level3_inequality/Level3Inequality.r1cs
+          # Compile C++ witness generator
+          cd artifacts/level3_inequality/Level3Inequality_cpp
+          make
+          ls -lh
+
+      # Groth16 setup for Level 3
+      - name: Setup age_level3 (Groth16)
+        run: |
+          cd backend-python/zkp
+          npx snarkjs groth16 setup artifacts/age_level3/age_level3.r1cs artifacts/common/pot16_final.ptau artifacts/age_level3/age_level3_0000.zkey
+          npx snarkjs zkey contribute artifacts/age_level3/age_level3_0000.zkey artifacts/age_level3/age_level3_final.zkey -n "ci-${{ github.sha }}" -e="$(head -c 64 /dev/urandom | xxd -p)"
+          npx snarkjs zkey export verificationkey artifacts/age_level3/age_level3_final.zkey artifacts/age_level3/verification_key.json
+
+      - name: Setup level3_inequality (Groth16)
+        run: |
+          cd backend-python/zkp
+          npx snarkjs groth16 setup artifacts/level3_inequality/Level3Inequality.r1cs artifacts/common/pot16_final.ptau artifacts/level3_inequality/Level3Inequality_0000.zkey
+          npx snarkjs zkey contribute artifacts/level3_inequality/Level3Inequality_0000.zkey artifacts/level3_inequality/Level3Inequality_final.zkey -n "ci-${{ github.sha }}" -e="$(head -c 64 /dev/urandom | xxd -p)"
+          npx snarkjs zkey export verificationkey artifacts/level3_inequality/Level3Inequality_final.zkey artifacts/level3_inequality/verification_key.json
+
+      - name: Upload Level 3 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zkp-level3-artifacts
+          path: |
+            backend-python/zkp/artifacts/age_level3/
+            backend-python/zkp/artifacts/level3_inequality/
+          retention-days: 30
+
+  # ===========================================================================
+  # Job 2b: AAIP Circuits (agent_capability, agent_reputation)
+  # ===========================================================================
+  aaip-circuits:
+    name: Build AAIP Circuits
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' && inputs.rebuild_all == 'true' ||
+      contains(github.event.head_commit.message, '[rebuild-aaip]')
+    env:
+      NODE_OPTIONS: "--max-old-space-size=8192"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install C++ toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential nlohmann-json3-dev libgmp-dev nasm
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: backend-python/zkp/node_modules
+          key: ${{ runner.os }}-zkp-node-${{ hashFiles('backend-python/zkp/package-lock.json') }}
+
+      - name: Prepare ptau path
+        run: mkdir -p backend-python/zkp/artifacts/common
+
+      - name: Cache ptau
+        uses: actions/cache@v4
+        with:
+          path: backend-python/zkp/artifacts/common/pot16_final.ptau
+          key: ptau-v16-final
+
+      - name: Install Circom (binary)
+        run: |
+          curl -sSL https://github.com/iden3/circom/releases/download/v2.1.6/circom-linux-amd64 -o /usr/local/bin/circom
+          chmod +x /usr/local/bin/circom
+
+      - name: Install npm dependencies
+        run: |
+          cd backend-python/zkp
+          npm ci
+
+      - name: Download ptau if missing
+        run: |
+          if [ ! -f backend-python/zkp/artifacts/common/pot16_final.ptau ]; then
+            curl -L --fail --retry 3 \
+              https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau \
+              -o backend-python/zkp/artifacts/common/pot16_final.ptau
+          fi
+
+      - name: Build agent_capability circuit
+        run: |
+          cd backend-python/zkp
+          circom circuits/agent_capability.circom --r1cs --wasm --sym -O2 -o artifacts/agent_capability -l node_modules
+          echo "✅ agent_capability constraint count:"
+          npx snarkjs r1cs info artifacts/agent_capability/agent_capability.r1cs
+
+      - name: Build agent_reputation circuit
+        run: |
+          cd backend-python/zkp
+          circom circuits/agent_reputation.circom --r1cs --wasm --sym -O2 -o artifacts/agent_reputation -l node_modules
+          echo "✅ agent_reputation constraint count:"
+          npx snarkjs r1cs info artifacts/agent_reputation/agent_reputation.r1cs
+
+      - name: Setup agent_capability (Groth16)
+        run: |
+          cd backend-python/zkp
+          npx snarkjs groth16 setup artifacts/agent_capability/agent_capability.r1cs artifacts/common/pot16_final.ptau artifacts/agent_capability/agent_capability_0000.zkey
+          npx snarkjs zkey contribute artifacts/agent_capability/agent_capability_0000.zkey artifacts/agent_capability/agent_capability_final.zkey -n "ci-${{ github.sha }}" -e="$(head -c 64 /dev/urandom | xxd -p)"
+          npx snarkjs zkey export verificationkey artifacts/agent_capability/agent_capability_final.zkey artifacts/agent_capability/verification_key.json
+
+      - name: Setup agent_reputation (Groth16)
+        run: |
+          cd backend-python/zkp
+          npx snarkjs groth16 setup artifacts/agent_reputation/agent_reputation.r1cs artifacts/common/pot16_final.ptau artifacts/agent_reputation/agent_reputation_0000.zkey
+          npx snarkjs zkey contribute artifacts/agent_reputation/agent_reputation_0000.zkey artifacts/agent_reputation/agent_reputation_final.zkey -n "ci-${{ github.sha }}" -e="$(head -c 64 /dev/urandom | xxd -p)"
+          npx snarkjs zkey export verificationkey artifacts/agent_reputation/agent_reputation_final.zkey artifacts/agent_reputation/verification_key.json
+
+      - name: Upload AAIP artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zkp-aaip-artifacts
+          path: |
+            backend-python/zkp/artifacts/agent_capability/
+            backend-python/zkp/artifacts/agent_reputation/
+          retention-days: 30
+
+  # ===========================================================================
+  # Job 3: Verify Integrity (runs after all builds)
+  # ===========================================================================
+  verify-integrity:
+    name: Verify Artifacts & Run Tests
+    runs-on: ubuntu-latest
+    needs: [simple-circuits]
+    env:
+      NODE_OPTIONS: "--max-old-space-size=4096"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download simple artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: zkp-simple-artifacts
+          path: backend-python/zkp/artifacts/
+
+      # Try to download Level 3 artifacts (may not exist on regular pushes)
+      - name: Download Level 3 artifacts (if available)
+        uses: actions/download-artifact@v4
+        with:
+          name: zkp-level3-artifacts
+          path: backend-python/zkp/artifacts/
+        continue-on-error: true
+
+      # Try to download AAIP artifacts (may not exist on regular pushes)
+      - name: Download AAIP artifacts (if available)
+        uses: actions/download-artifact@v4
+        with:
+          name: zkp-aaip-artifacts
+          path: backend-python/zkp/artifacts/
+        continue-on-error: true
+
+      - name: Install npm dependencies
+        run: |
+          cd backend-python/zkp
+          npm ci
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r backend-python/requirements.txt pytest
+
+      - name: Verify vkey integrity
+        run: |
+          cd backend-python/zkp
+          python scripts/verify_key_integrity.py
+
+      - name: Run ZK property tests
+        run: |
+          cd backend-python
+          ZK_TESTS=1 pytest tests/test_zk_properties.py -v --tb=short
+
+      - name: Generate integrity report
+        run: |
+          echo "## ZKP Artifact Integrity Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Circuit | vkey SHA256 | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------------|--------|" >> $GITHUB_STEP_SUMMARY
+          for vkey in backend-python/zkp/artifacts/*/verification_key.json; do
+            circuit=$(dirname $vkey | xargs basename)
+            sha=$(sha256sum $vkey | cut -d' ' -f1 | head -c 16)
+            echo "| $circuit | \`${sha}...\` | ✅ |" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow**: ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # Job 4: Weekly Integrity Audit (scheduled only)
+  # ===========================================================================
+  weekly-audit:
+    name: Weekly Integrity Audit
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    needs: [simple-circuits, level3-circuits]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: backend-python/zkp/artifacts/
+          merge-multiple: true
+
+      - name: Compare with committed INTEGRITY.json
+        run: |
+          cd backend-python/zkp
+          echo "## Weekly Integrity Audit" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Check if INTEGRITY.json matches current build
+          if [ -f INTEGRITY.json ]; then
+            echo "Comparing built vkeys with committed INTEGRITY.json..." >> $GITHUB_STEP_SUMMARY
+            python scripts/verify_key_integrity.py --check
+            echo "✅ All verification keys match committed hashes" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No INTEGRITY.json found - please commit integrity hashes" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Create issue on integrity failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 ZKP Integrity Check Failed',
+              body: `Weekly integrity audit detected a mismatch in verification keys.\n\n**Workflow run**: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\nPlease investigate and rebuild artifacts if needed.`,
+              labels: ['security', 'zkp', 'urgent']
+            })

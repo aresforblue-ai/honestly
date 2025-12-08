@@ -50,6 +50,7 @@ class ShareLinkService:
         """
         # Generate cryptographically secure token
         token = self._generate_token()
+        token_hash = self._hash_token(token)
         
         # Set default expiration (30 days)
         if expires_at is None:
@@ -66,7 +67,7 @@ class ShareLinkService:
         )
         
         # Persist to Neo4j
-        self._persist_link(proof_link, user_id)
+        self._persist_link(proof_link, user_id, token_hash)
         
         return proof_link
     
@@ -80,15 +81,25 @@ class ShareLinkService:
         Returns:
             ProofLink if valid, None otherwise
         """
+        token_hash = self._hash_token(token)
+
         query = """
-        MATCH (p:ProofLink {share_token: $token})
+        MATCH (p:ProofLink {share_token_hash: $token_hash})
         RETURN p
         LIMIT 1
         """
         
-        results = self.graph.run(query, {"token": token}).data()
+        results = self.graph.run(query, {"token_hash": token_hash}).data()
         if not results:
-            return None
+            # Legacy fallback: if hash not found, try plaintext (should be migrated)
+            fallback_query = """
+            MATCH (p:ProofLink {share_token: $token})
+            RETURN p
+            LIMIT 1
+            """
+            results = self.graph.run(fallback_query, {"token": token}).data()
+            if not results:
+                return None
         
         link_node = results[0]['p']
         link_dict = dict(link_node)
@@ -106,11 +117,11 @@ class ShareLinkService:
                 return None
         
         # Increment access count
-        self._increment_access_count(token)
+        self._increment_access_count(token_hash)
         
         # Convert to ProofLink object
         proof_link = ProofLink(
-            share_token=link_dict['share_token'],
+            share_token=token,  # return the presented token; we store hash
             document_id=link_dict['document_id'],
             expires_at=datetime.fromisoformat(link_dict['expires_at']) if link_dict.get('expires_at') else None,
             access_level=AccessLevel(link_dict.get('access_level', 'PROOF_ONLY')),
@@ -137,14 +148,15 @@ class ShareLinkService:
         Returns:
             True if revoked, False otherwise
         """
+        token_hash = self._hash_token(token)
         query = """
-        MATCH (u:User {id: $user_id})-[:OWNS]->(d:Document)<-[:FOR_DOCUMENT]-(p:ProofLink {share_token: $token})
+        MATCH (u:User {id: $user_id})-[:OWNS]->(d:Document)<-[:FOR_DOCUMENT]-(p:ProofLink {share_token_hash: $token_hash})
         SET p.expires_at = $now
         RETURN p
         """
         
         now = datetime.utcnow().isoformat()
-        results = self.graph.run(query, {"user_id": user_id, "token": token, "now": now}).data()
+        results = self.graph.run(query, {"user_id": user_id, "token_hash": token_hash, "now": now}).data()
         
         return len(results) > 0
     
@@ -155,12 +167,12 @@ class ShareLinkService:
         token = secrets.token_urlsafe(32)
         return token
     
-    def _persist_link(self, proof_link: ProofLink, user_id: str):
+    def _persist_link(self, proof_link: ProofLink, user_id: str, token_hash: str):
         """Persist proof link to Neo4j."""
         tx = self.graph.begin()
         
         link_props = {
-            "share_token": proof_link.share_token,
+            "share_token_hash": token_hash,
             "document_id": proof_link.document_id,
             "expires_at": proof_link.expires_at.isoformat() if proof_link.expires_at else None,
             "access_level": proof_link.access_level.value,
@@ -171,7 +183,7 @@ class ShareLinkService:
         }
         
         link_node = Node("ProofLink", **link_props)
-        tx.merge(link_node, "ProofLink", "share_token")
+        tx.merge(link_node, "ProofLink", "share_token_hash")
         
         # Link to document
         doc_node = Node("Document", id=proof_link.document_id)
@@ -187,11 +199,15 @@ class ShareLinkService:
         
         tx.commit()
     
-    def _increment_access_count(self, token: str):
+    def _increment_access_count(self, token_hash: str):
         """Increment access count for a link."""
         query = """
-        MATCH (p:ProofLink {share_token: $token})
+        MATCH (p:ProofLink {share_token_hash: $token_hash})
         SET p.access_count = coalesce(p.access_count, 0) + 1
         """
-        self.graph.run(query, {"token": token})
+        self.graph.run(query, {"token_hash": token_hash})
+
+    def _hash_token(self, token: str) -> str:
+        """Hash a token using SHA-256 (no raw token stored)."""
+        return hashlib.sha256(token.encode()).hexdigest()
 

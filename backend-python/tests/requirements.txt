@@ -1,0 +1,13 @@
+# Production Validation Test Dependencies
+
+# Security Audit
+requests>=2.31.0
+
+# Chaos Engineering
+docker>=6.1.0
+
+# Load Testing (k6)
+# Install separately: https://k6.io/docs/getting-started/installation/
+# k6 is a Go binary, not a Python package
+
+

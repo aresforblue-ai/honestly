@@ -11,6 +11,11 @@ numpy==1.26.4
 cryptography>=41.0.0
 qrcode[pil]>=7.4.2
 pyjwt>=2.8.0
+pydantic>=2.0.0
+# Production dependencies
+redis>=5.0.0  # Optional: for distributed rate limiting
+# ML dependencies (Phase 3)
+scikit-learn>=1.3.0  # Optional: for anomaly detection (fallback to heuristics if missing)
 # Testing dependencies
 pytest>=7.4.0
 pytest-cov>=4.1.0

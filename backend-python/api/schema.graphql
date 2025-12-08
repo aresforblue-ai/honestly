@@ -8,6 +8,46 @@ type Claim {
   provenance: String
 }
 
+# App/Entity Types for Frontend Dashboard
+type App {
+  id: ID!
+  name: String!
+  whistlerScore: Float
+  metadata: AppMetadata
+  claims: [Claim!]!
+  reviews: [Review!]!
+}
+
+type AppMetadata {
+  zkProofVerified: Boolean
+  category: String
+  description: String
+}
+
+type Review {
+  id: ID!
+  rating: Float
+  sentiment: String
+  text: String
+}
+
+type ScoreBreakdownItem {
+  value: Float!
+  label: String
+}
+
+type ScoreBreakdown {
+  privacy: ScoreBreakdownItem
+  financial: ScoreBreakdownItem
+  security: ScoreBreakdownItem
+  transparency: ScoreBreakdownItem
+}
+
+type AppScore {
+  grade: String!
+  breakdown: ScoreBreakdown!
+}
+
 # Vault Types
 enum DocumentType {
   IDENTITY
@@ -77,6 +117,12 @@ type ZKProof {
 }
 
 type Query {
+  # App/Entity Queries for Dashboard
+  apps: [App!]!
+  app(id: ID!): App
+  scoreApp(appId: ID!): AppScore
+  
+  # Claim Queries
   claim(id: ID!): Claim
   search(query: String!, topK: Int = 5): [Claim]
   

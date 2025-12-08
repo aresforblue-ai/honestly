@@ -1,0 +1,26 @@
+{
+  "name": "@conductme/trust-bridge",
+  "version": "1.0.0",
+  "description": "Semaphore identity bridge for human-gated AI orchestration",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@semaphore-protocol/identity": "^4.0.0",
+    "@semaphore-protocol/group": "^4.0.0",
+    "@semaphore-protocol/proof": "^4.0.0",
+    "@semaphore-protocol/core": "^4.0.0",
+    "ethers": "^6.11.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0",
+    "@types/node": "^20.11.0"
+  }
+}
+

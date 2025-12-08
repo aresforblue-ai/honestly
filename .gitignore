@@ -65,3 +65,23 @@ htmlcov/
 tmp/
 temp/
 *.tmp
+
+# Cursor AI rules
+.cursor/rules/codacy.mdc
+
+# ZKP large binaries (rebuild locally)
+*.zkey
+*.ptau
+*.r1cs
+*.sym
+*_js/
+
+# ZKP temp files
+tmp_a.json
+tmp_b.json
+input_age3.json
+witness_age3.wtns
+
+# Python virtual environment
+.venv/
+venv/

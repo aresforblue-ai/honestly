@@ -1,0 +1,22 @@
+# CRITICAL: Never commit proving keys (contain toxic waste)
+*.zkey
+!verification_key.json
+
+# Temporary files
+*.tmp
+*.log
+
+# Node modules (if installed locally)
+node_modules/
+
+# Build artifacts (keep structure, but not large binaries)
+*.wasm
+*.r1cs
+*.sym
+
+# Keep verification keys (public, safe to commit)
+!verification_key.json
+
+# Keep sample inputs/outputs
+!samples/
+

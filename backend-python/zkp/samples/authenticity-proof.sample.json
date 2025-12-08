@@ -1,0 +1,11 @@
+{
+  "circuit": "authenticity",
+  "note": "Sample placeholder proof; not valid. Replace with real output from snark-runner.js.",
+  "proof": {
+    "pi_a": ["1", "1", "1"],
+    "pi_b": [["1", "1"], ["1", "1"], ["1", "1"]],
+    "pi_c": ["1", "1", "1"]
+  },
+  "publicSignals": ["deadbeef", "feedface"]
+}
+

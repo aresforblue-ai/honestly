@@ -3,8 +3,11 @@ REST endpoints for vault operations (file uploads, share links, QR codes).
 """
 import os
 import base64
+import secrets
+import time
 from typing import Optional
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+import logging
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, status, Depends
 from fastapi.responses import JSONResponse
 from py2neo import Graph
 
@@ -13,43 +16,58 @@ from vault.models import DocumentType
 from vault.share_links import ShareLinkService
 from vault.timeline import TimelineService
 from blockchain.sdk.fabric_client import FabricClient
-from api.qr_generator import generate_qr_response, generate_qr_code
+from api.qr_generator import generate_qr_response
+from api.cache import cached, get as cache_get, set as cache_set
+from api.monitoring import record_metric
+from api.utils import get_vkey_hash, hmac_sign
+from api.auth import get_current_user
+from datetime import datetime
 
 # Initialize services
 NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
 NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
 NEO4J_PASS = os.getenv('NEO4J_PASS', 'test')
+PUBLIC_RATE_LIMIT_WINDOW = int(os.getenv("PUBLIC_RATE_LIMIT_WINDOW", "60"))
+PUBLIC_RATE_LIMIT_MAX = int(os.getenv("PUBLIC_RATE_LIMIT_MAX", "20"))
 
 graph = Graph(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
 vault_storage = VaultStorage()
 share_link_service = ShareLinkService(graph)
 timeline_service = TimelineService(graph)
 fabric_client = FabricClient()
+logger = logging.getLogger("security")
+
+# Simple in-memory rate limiter for public endpoints (best-effort, per-IP)
+_rate_bucket: dict[str, dict] = {}
+
+
+def _check_rate_limit(key: str):
+    now = time.time()
+    bucket = _rate_bucket.get(key, {"count": 0, "window_start": now})
+    if now - bucket["window_start"] > PUBLIC_RATE_LIMIT_WINDOW:
+        bucket = {"count": 0, "window_start": now}
+    bucket["count"] += 1
+    _rate_bucket[key] = bucket
+    if bucket["count"] > PUBLIC_RATE_LIMIT_MAX:
+        logger.warning("rate_limit_exceeded", extra={"key": key, "count": bucket["count"]})
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded")
 
 router = APIRouter(prefix="/vault", tags=["vault"])
-
-
-# Mock authentication for MVP
-def get_user_id() -> str:
-    """Get current user ID (mock for MVP)."""
-    # In production, extract from JWT token
-    return os.getenv('MOCK_USER_ID', 'test_user_1')
 
 
 @router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
     document_type: str = Form(...),
-    user_id: Optional[str] = Form(None),
-    metadata: Optional[str] = Form(None)
+    metadata: Optional[str] = Form(None),
+    user=Depends(get_current_user),
 ):
     """
     Upload a document to the vault.
     
     Returns document ID and hash.
     """
-    # Get user ID
-    uid = user_id or get_user_id()
+    uid = user["user_id"]
     
     # Read file data
     file_data = await file.read()
@@ -66,7 +84,7 @@ async def upload_document(
     if metadata:
         try:
             meta = json.loads(metadata)
-        except:
+        except Exception:
             pass
     
     # Upload and encrypt document
@@ -87,7 +105,7 @@ async def upload_document(
         )
         fabric_tx_id = anchor_result.get('transactionId')
     except Exception as e:
-        print(f"Failed to anchor to Fabric: {e}")
+        logger.warning("fabric_anchor_failed", extra={"error": str(e), "document_id": document.id})
         fabric_tx_id = None
     
     # Persist to Neo4j
@@ -155,12 +173,12 @@ async def upload_document(
 
 
 @router.get("/document/{document_id}")
-async def get_document(document_id: str, user_id: Optional[str] = None):
+async def get_document(document_id: str, user=Depends(get_current_user)):
     """
     Retrieve a document (decrypted).
     Requires authentication.
     """
-    uid = user_id or get_user_id()
+    uid = user["user_id"]
     
     # Verify ownership
     query = """
@@ -186,24 +204,27 @@ async def get_document(document_id: str, user_id: Optional[str] = None):
                 "data": base64.b64encode(doc_data).decode('utf-8')
             }
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve document: {str(e)}")
+    except Exception:
+        logger.exception("document_retrieve_failed", extra={"document_id": document_id, "user_id": uid})
+        raise HTTPException(status_code=500, detail="Failed to retrieve document")
 
 
 @router.get("/share/{token}")
-async def verify_share_link(token: str):
+async def verify_share_link(token: str, request: Request):
     """
     Public endpoint to verify a share link and return proof data.
     """
+    _check_rate_limit(f"share:{request.client.host}")
+
     proof_link = share_link_service.validate_token(token)
     
     if not proof_link:
-        raise HTTPException(status_code=404, detail="Share link not found or expired")
+        raise HTTPException(status_code=404, detail="Not found")
     
     # Get document metadata
     doc_meta = vault_storage.get_document_metadata(proof_link.document_id)
     if not doc_meta:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=404, detail="Not found")
     
     # Get attestation
     attestation = fabric_client.query_attestation(proof_link.document_id)
@@ -245,10 +266,83 @@ async def verify_share_link(token: str):
 
 
 @router.get("/qr/{token}")
-async def get_qr_code(token: str):
+async def get_qr_code(token: str, request: Request):
     """
     Generate QR code for a share link.
     """
+    _check_rate_limit(f"qr:{request.client.host}")
     share_url = share_link_service.get_share_url(token)
     return generate_qr_response(share_url)
+
+
+@router.get("/share/{token}/bundle")
+@cached(ttl=60.0, key_prefix="share_bundle")  # Cache for 60 seconds
+async def get_share_bundle(token: str, request: Request):
+    """
+    Resolve a share token into a verification bundle for QR consumers.
+    Optimized for <0.2s response time with caching.
+    """
+    start_time = time.time()
+    client_key = f"bundle:{request.client.host}"
+    _check_rate_limit(client_key)
+
+    # Check cache first
+    cache_key = f"share_bundle:{token}"
+    cached_bundle = cache_get(cache_key)
+    if cached_bundle:
+        record_metric("share_bundle", time.time() - start_time, success=True)
+        return cached_bundle
+
+    proof_link = share_link_service.validate_token(token)
+
+    if not proof_link:
+        record_metric("share_bundle", time.time() - start_time, success=False)
+        raise HTTPException(status_code=404, detail="Not found")
+
+    doc_meta = vault_storage.get_document_metadata(proof_link.document_id)
+    if not doc_meta:
+        record_metric("share_bundle", time.time() - start_time, success=False)
+        raise HTTPException(status_code=404, detail="Not found")
+
+    # Only query attestation if needed (can be slow)
+    attestation = None
+    if proof_link.proof_type:
+        try:
+            attestation = fabric_client.query_attestation(proof_link.document_id)
+        except Exception:
+            pass  # Don't fail if attestation query fails
+
+    bundle = {
+        "share_token": proof_link.share_token,
+        "document_id": proof_link.document_id,
+        "proof_type": proof_link.proof_type,
+        "access_level": proof_link.access_level.value,
+        "document_hash": doc_meta.get('hash'),
+        "issued_at": datetime.utcnow().isoformat(),
+        "expires_at": proof_link.expires_at.isoformat() if proof_link.expires_at else None,
+        "max_accesses": proof_link.max_accesses,
+        "nonce": secrets.token_hex(16),
+        "verification": {
+            "circuit": proof_link.proof_type,
+            "vk_url": f"/zkp/artifacts/{proof_link.proof_type}/verification_key.json",
+            "vk_sha256": get_vkey_hash(proof_link.proof_type),
+            "attestation": attestation or None,
+        }
+    }
+
+    if not bundle["verification"]["vk_sha256"]:
+        record_metric("share_bundle", time.time() - start_time, success=False)
+        raise HTTPException(status_code=503, detail="Verification key unavailable for circuit")
+
+    signature = hmac_sign(bundle)
+    if signature:
+        bundle["signature"] = signature
+
+    # Cache the bundle
+    cache_set(cache_key, bundle, ttl=60.0)
+    
+    duration = time.time() - start_time
+    record_metric("share_bundle", duration, success=True)
+    
+    return bundle
 

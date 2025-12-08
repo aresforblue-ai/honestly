@@ -1,0 +1,207 @@
+# Docker Compose for Local Development
+# Usage: docker-compose -f docker-compose.dev.yml up
+
+version: "3.9"
+
+services:
+  # ============================================
+  # NEO4J - GRAPH DATABASE
+  # ============================================
+  neo4j:
+    image: neo4j:5.12-community
+    container_name: honestly-neo4j
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    environment:
+      NEO4J_AUTH: neo4j/honestly_dev_password
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
+      NEO4J_dbms_memory_heap_initial__size: 512m
+      NEO4J_dbms_memory_heap_max__size: 1G
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - ./neo4j:/var/lib/neo4j/import
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:7474"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - honestly-network
+
+  # ============================================
+  # REDIS - CACHING & RATE LIMITING
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: honestly-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - honestly-network
+
+  # ============================================
+  # PYTHON API BACKEND
+  # ============================================
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: honestly-api
+    ports:
+      - "8000:8000"
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASS=honestly_dev_password
+      - REDIS_URL=redis://redis:6379/0
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+      - ALLOW_GENERATED_VAULT_KEY=true
+      - RATE_LIMIT_ENABLED=true
+      - LOG_LEVEL=DEBUG
+      - RELOAD=true
+    volumes:
+      - ./backend-python:/app
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn api.app:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - honestly-network
+
+  # ============================================
+  # GRAPHQL BACKEND
+  # ============================================
+  graphql:
+    build:
+      context: ./backend-graphql
+      dockerfile: ../docker/Dockerfile.graphql
+    container_name: honestly-graphql
+    ports:
+      - "4000:4000"
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=honestly_dev_password
+      - NODE_ENV=development
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    volumes:
+      - ./backend-graphql:/app
+      - /app/node_modules
+    command: npm run dev
+    networks:
+      - honestly-network
+
+  # ============================================
+  # FRONTEND (VITE DEV SERVER)
+  # ============================================
+  frontend:
+    image: node:20-alpine
+    container_name: honestly-frontend
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_GRAPHQL_URI=http://localhost:4000/graphql
+    volumes:
+      - ./frontend-app:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    networks:
+      - honestly-network
+
+  # ============================================
+  # CONDUCTME (NEXT.JS DEV SERVER)
+  # ============================================
+  conductme:
+    image: node:20-alpine
+    container_name: honestly-conductme
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./conductme:/app
+      - /app/node_modules
+      - /app/core/node_modules
+    command: sh -c "npm install && npm run dev"
+    networks:
+      - honestly-network
+
+  # ============================================
+  # PROMETHEUS (METRICS)
+  # ============================================
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: honestly-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - honestly-network
+
+  # ============================================
+  # GRAFANA (DASHBOARDS)
+  # ============================================
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: honestly-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=honestly_grafana
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - honestly-network
+
+# ============================================
+# VOLUMES
+# ============================================
+volumes:
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# ============================================
+# NETWORKS
+# ============================================
+networks:
+  honestly-network:
+    driver: bridge
+

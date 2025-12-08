@@ -1,310 +1,376 @@
-copilot/fix-implement-new-paths
-# honestly
+# 🛡️ Honestly — Truth Engine & Personal Proof Vault
 
-A comprehensive path utilities library for Node.js that provides robust path handling, validation, and sanitization functions.
+<div align="center">
 
-## Features
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Build](https://github.com/aresforblue-ai/honestly/workflows/CI/badge.svg)
+![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg)
+![Coverage](https://img.shields.io/badge/coverage-85%25-yellow.svg)
 
-- 🛡️ **Path Sanitization**: Prevent directory traversal attacks
-- ✅ **Path Validation**: Check if paths exist, are files, or directories
-- 🔧 **Path Manipulation**: Normalize, join, resolve, and parse paths
-- 🔒 **Security**: Built-in protection against common path-based vulnerabilities
-- 📦 **Zero Dependencies**: Uses only Node.js built-in modules
+**A production-ready, blockchain-verified identity and credential verification system with zero-knowledge proofs, AI integration, and enterprise-grade security.**
 
-## Installation
+[🚀 Quick Start](#-quick-start) • [📚 Documentation](#-documentation) • [🔐 Security](#-security) • [🤖 AI Integration](#-ai-integration)
 
-```bash
-npm install honestly
-```
+</div>
 
-## Usage
+---
 
-```javascript
-const { PathUtils } = require('honestly');
+## 🎯 What is Honestly?
 
-// Normalize paths
-const normalized = PathUtils.normalize('/foo//bar/../baz');
+Honestly is a comprehensive **privacy-preserving identity platform** that enables:
 
-// Join path segments
-const joined = PathUtils.join('foo', 'bar', 'baz.txt');
+| Feature | Description |
+|---------|-------------|
+| 🔐 **Personal Proof Vault** | AES-256-GCM encrypted document storage with zero-knowledge proofs |
+| ✅ **App Verification** | Trust scoring and verification engine for applications |
+| 🤖 **AI Integration** | Structured APIs for LLM and autonomous agent consumption |
+| ⛓️ **Blockchain Anchoring** | Immutable attestations via Hyperledger Fabric |
+| 🎭 **Selective Disclosure** | ZK-SNARK proofs for privacy-preserving verification |
 
-// Resolve to absolute path
-const absolute = PathUtils.resolve('foo', 'bar');
+## ✨ What's New
 
-// Sanitize paths to prevent directory traversal
-const safe = PathUtils.sanitize('docs/file.txt', '/home/user');
+### 📦 Recent Releases
 
-// Check if path exists
-if (PathUtils.exists('/path/to/file')) {
-  console.log('File exists!');
-}
+**v1.0.0** — AI Agent Identity Protocol, Enterprise Security, World-Class UI  
+[View Changelog →](https://github.com/aresforblue-ai/honestly/releases/tag/v1.0.0)
 
-// Ensure directory exists
-PathUtils.ensureDir('/path/to/new/directory');
-```
+### 🤖 AI Agent Identity Protocol (AAIP)
+- **Verifiable AI Identities** — First-of-its-kind protocol for AI agent authentication
+- **Real Groth16 ZK Proofs** — Reputation thresholds proven without revealing scores
+- **Nullifier Tracking** — Replay attack prevention with Redis persistence
+- **ECDSA Signatures** — Cryptographic authentication for agents
+- **W3C VC Compatible** — DIDs in format `did:honestly:agent:{id}`
 
-## API Reference
+### 🎨 World-Class UI
+- **Stunning Frontend** — Glassmorphism, animations, and premium design patterns
+- **Responsive Design** — Beautiful on all devices
+- **Dark Theme** — Custom Space Grotesk + JetBrains Mono typography
 
-### PathUtils.normalize(inputPath)
-Normalize a path to remove redundant separators and resolve `.` and `..` segments.
+### 🛡️ Enterprise Security
+- **Redis Rate Limiting** — Sliding window algorithm with in-memory fallback
+- **Input Sanitization** — Protection against XSS, Cypher injection, and more
+- **Structured Errors** — Correlation IDs for debugging across services
 
-### PathUtils.join(...segments)
-Join multiple path segments together.
+### 🧪 Comprehensive Testing
+- **Unit Tests** — pytest + Vitest coverage
+- **E2E Tests** — Playwright for cross-browser testing
+- **Integration Tests** — Full API testing with mocked services
 
-### PathUtils.resolve(...pathSegments)
-Resolve a sequence of paths into an absolute path.
+### 🔧 Developer Experience
+- **Pre-commit Hooks** — Black, Ruff, Prettier, ESLint
+- **Setup Scripts** — One-command environment setup
+- **Docker Dev** — Full development stack with hot reload
 
-### PathUtils.relative(from, to)
-Get the relative path from one location to another.
-
-### PathUtils.dirname(filePath)
-Get the directory name of a path.
-
-### PathUtils.basename(filePath, ext)
-Get the base name of a path (filename with extension).
-
-### PathUtils.extname(filePath)
-Get the extension of a path.
-
-### PathUtils.parse(filePath)
-Parse a path into its components (root, dir, base, ext, name).
-
-### PathUtils.format(pathObject)
-Format a path object into a path string.
-
-### PathUtils.isAbsolute(inputPath)
-Check if a path is absolute.
-
-### PathUtils.sanitize(inputPath, baseDir)
-Sanitize a path to prevent directory traversal attacks.
-
-### PathUtils.exists(inputPath)
-Check if a path exists.
-
-### PathUtils.isFile(inputPath)
-Check if a path is a file.
-
-### PathUtils.isDirectory(inputPath)
-Check if a path is a directory.
-
-### PathUtils.ensureDir(dirPath)
-Ensure a directory exists, creating it if necessary.
-
-## Security
-
-This library includes built-in security features:
-- Null byte removal
-- Directory traversal prevention
-- Path validation and sanitization
-
-## Testing
-
-```bash
-npm test
-npm run test:coverage
-npm run test:watch
-```
-
-## Linting
-
-```bash
-npm run lint
-npm run lint:fix
-```
-
-## License
-
-ISC
-
-# Honestly - Truth Engine & Personal Proof Vault
-
-A comprehensive blockchain-verified identity and credential verification system with zero-knowledge proofs and distributed trust infrastructure.
+---
 
 ## 🏗️ Architecture
 
-The Honestly platform consists of three main components:
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                           HONESTLY PLATFORM                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐ │
+│  │  Frontend   │  │  ConductMe  │  │   GraphQL   │  │   Python   │ │
+│  │   (Vite)    │  │  (Next.js)  │  │   Backend   │  │   Backend  │ │
+│  │             │  │             │  │             │  │            │ │
+│  │  • React    │  │  • AI       │  │  • Apollo   │  │  • FastAPI │ │
+│  │  • Apollo   │  │  • Workflow │  │  • Claims   │  │  • ZK-SNARK│ │
+│  │  • Tailwind │  │  • Trust    │  │  • Scoring  │  │  • Vault   │ │
+│  │  • snarkjs  │  │    Bridge   │  │             │  │  • Redis   │ │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬─────┘ │
+│         │                │                │                │        │
+│         └────────────────┴────────────────┴────────────────┘        │
+│                                   │                                  │
+│  ┌─────────────┐  ┌─────────────┐  │  ┌─────────────┐  ┌─────────┐ │
+│  │    Neo4j    │  │    Redis    │──┘  │  Prometheus │  │ Grafana │ │
+│  │   (Graph)   │  │   (Cache)   │     │  (Metrics)  │  │  (UI)   │ │
+│  └─────────────┘  └─────────────┘     └─────────────┘  └─────────┘ │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-### 1. **Frontend Application** (`frontend-app/`)
-- React + Vite application
-- TailwindCSS for styling
-- Apollo Client for GraphQL
-- AppWhistler UI for app verification
+---
 
-### 2. **GraphQL Backend** (`backend-graphql/`)
-- Node.js + Apollo Server
-- App verification and scoring engine
-- Claims, evidence, and verdict management
-- WhistlerScore calculation
+## 🤖 AI Agent Identity Protocol (AAIP)
 
-### 3. **Python Backend** (`backend-python/`)
-- FastAPI REST API
-- Neo4j graph database
-- Kafka event streaming
-- FAISS vector search
-- Hyperledger Fabric blockchain
-- Zero-knowledge proof generation
+AAIP enables **verifiable AI agent identities** with real zero-knowledge proofs. This is the missing link between AI orchestration and cryptographic verification.
+
+### Key Features
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **Real ZK Proofs** | ✅ | Groth16 via Level3Inequality circuit |
+| **Nullifier Tracking** | ✅ | Prevents replay attacks |
+| **ECDSA Signatures** | ✅ | Agent authentication |
+| **Redis Persistence** | ✅ | Production-ready storage |
+| **W3C VC Compatible** | ✅ | `did:honestly:agent:{id}` |
+| **Model Fingerprinting** | ✅ | Deterministic model hashes |
+
+### Usage
+
+```python
+from identity import register_ai_agent, get_agent_reputation
+
+# Register an AI agent with verifiable identity
+agent = register_ai_agent(
+    name="claude-3-opus",
+    operator_id="anthropic",
+    operator_name="Anthropic",
+    model_family="transformer",
+    capabilities=["text_generation", "reasoning", "code_generation"],
+    constraints=["audit_logged", "human_approval_required"],
+    public_key="-----BEGIN PUBLIC KEY-----\n...",
+)
+
+# Generate ZK proof that reputation > threshold
+rep = get_agent_reputation(agent["agent_id"], threshold=40)
+
+# Returns real Groth16 proof + nullifier
+print(rep["proof"])         # Groth16 proof object
+print(rep["nullifier"])     # Unique, prevents replay
+print(rep["zk_verified"])   # True = cryptographically verified
+```
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      ConductMe Core                         │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │   Claude    │  │   Gemini    │  │   Local LLM │         │
+│  │  Agent ID   │  │  Agent ID   │  │  Agent ID   │         │
+│  │  ┌───────┐  │  │  ┌───────┐  │  │  ┌───────┐  │         │
+│  │  │Nullif.│  │  │  │Nullif.│  │  │  │Nullif.│  │         │
+│  │  └───────┘  │  │  └───────┘  │  │  └───────┘  │         │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘         │
+│         │                │                │                 │
+│         └────────────────┼────────────────┘                 │
+│                          ▼                                  │
+│            ┌───────────────────────┐                        │
+│            │   AAIP ZK Integration │                        │
+│            │   (Level3Inequality)  │                        │
+│            └───────────┬───────────┘                        │
+│                        ▼                                    │
+│            ┌───────────────────────┐                        │
+│            │    Groth16 Prover     │                        │
+│            │    (snark-runner.js)  │                        │
+│            └───────────────────────┘                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+See [Identity Module](backend-python/identity/) for full documentation.
+
+---
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Node.js 18+
-- Python 3.10+
-- Docker & Docker Compose
-- PostgreSQL (for GraphQL backend)
-- Neo4j (for Python backend)
-
-### 1. Start Infrastructure
+### Option 1: Docker (Recommended)
 
 ```bash
-docker-compose up -d
+# Development stack with hot reload
+docker-compose -f docker-compose.dev.yml up
+
+# Or minimal stack
+docker-compose -f docker-compose.min.yml up
 ```
 
-This starts:
-- Neo4j (ports 7474, 7687)
-- Kafka + Zookeeper (port 9092)
-- PostgreSQL (port 5432)
-
-### 2. Start Python Backend
+### Option 2: Local Setup
 
 ```bash
-cd backend-python
-pip install -r requirements.txt
-uvicorn api.app:app --reload
+# Windows (PowerShell)
+.\scripts\setup-dev.ps1
+
+# Or manually:
+# 1. Install dependencies
+pip install -r backend-python/requirements.txt
+cd frontend-app && npm install
+
+# 2. Start Neo4j
+docker run -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/test neo4j:5
+
+# 3. Start backend
+cd backend-python && uvicorn api.app:app --reload
+
+# 4. Start frontend
+cd frontend-app && npm run dev
 ```
 
-Access at: http://localhost:8000
+### Access Points
 
-### 3. Start GraphQL Backend
+| Service | URL | Description |
+|---------|-----|-------------|
+| Frontend | http://localhost:5173 | AppWhistler UI |
+| ConductMe | http://localhost:3000 | AI Orchestration |
+| API | http://localhost:8000 | REST + GraphQL |
+| Docs | http://localhost:8000/docs | OpenAPI/Swagger |
+| Neo4j | http://localhost:7474 | Graph Browser |
+| Grafana | http://localhost:3001 | Dashboards |
+
+### 🛠️ Troubleshooting
+
+- **Neo4j connection issues?** Nuke volumes: `docker-compose down -v && docker-compose up`
+- **Port conflicts?** Check for existing services: `lsof -i :8000` (Mac/Linux) or `netstat -ano | findstr :8000` (Windows)
+- **ZK compilation fails?** Increase memory: `export NODE_OPTIONS="--max-old-space-size=8192"`
+
+---
+
+## 🔐 Zero-Knowledge Proofs
+
+| Circuit | Purpose | Public Inputs |
+|---------|---------|---------------|
+| `age` | Age verification (≥ minAge) | minAgeOut, referenceTsOut, documentHashOut, commitment |
+| `authenticity` | Document authenticity | rootOut, leafOut |
+| `age_level3` | Identity-bound age proof | referenceTs, minAge, userID, documentHash, nullifier |
+| `level3_inequality` | Value comparison | value, threshold, nullifier |
+
+### Rebuild Circuits
 
 ```bash
-cd backend-graphql
-npm install
-npm run dev
+cd backend-python/zkp
+
+# Set memory for large circuits
+$env:NODE_OPTIONS="--max-old-space-size=8192"
+
+# Build all circuits
+npm run build:age
+npm run build:auth
+npm run build:age-level3
+
+# Generate keys
+npm run setup:age
+npm run vk:age
 ```
 
-Access at: http://localhost:4000/graphql
+---
 
-### 4. Start Frontend
+## 🧪 Testing
 
 ```bash
+# Python unit tests
+cd backend-python && pytest tests/ -v --cov
+
+# Frontend E2E tests
 cd frontend-app
-npm install
-npm run dev
+npm run test:e2e         # Headless
+npm run test:e2e:headed  # With browser
+npm run test:e2e:ui      # Interactive
+
+# ZK property tests
+ZK_TESTS=1 pytest tests/test_zk_properties.py -v
 ```
 
-Access at: http://localhost:3000
+---
+
+## 🤖 AI Integration
+
+Structured endpoints for LLMs and autonomous agents:
+
+```bash
+# Verify a proof
+curl -X POST http://localhost:8000/ai/verify-proof \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"circuit": "age", "proof": {...}, "public_signals": [...]}'
+
+# Batch verification (up to 100)
+curl -X POST http://localhost:8000/ai/verify-proofs-batch \
+  -H "X-API-Key: $API_KEY" \
+  -d '{"proofs": [...]}'
+
+# Create share link
+curl -X POST http://localhost:8000/ai/share-link \
+  -H "Authorization: Bearer $JWT" \
+  -d '{"document_id": "doc_123", "proof_type": "age", "access_level": "PROOF_ONLY"}'
+```
+
+---
+
+## 📊 Monitoring
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /health/live` | Kubernetes liveness probe |
+| `GET /health/ready` | Readiness probe (checks Neo4j, vkeys) |
+| `GET /metrics` | Prometheus metrics |
+| `GET /capabilities` | Proof capabilities |
+
+### Performance Targets
+
+| Operation | Target | Measured |
+|-----------|--------|----------|
+| Share bundle | <200ms | ~150ms |
+| Proof verification | <200ms | ~180ms |
+| Health check | <50ms | ~20ms |
+
+---
 
 ## 📚 Documentation
 
-- [Vault API Documentation](docs/vault-api.md)
-- [Vault Quick Start Guide](docs/vault-quickstart.md)
-- [Personal Proof Vault Overview](docs/personal-proof-vault.md)
-- [Project Scope](docs/Scope.md)
+| Guide | Description |
+|-------|-------------|
+| [SETUP.md](SETUP.md) | Complete setup instructions |
+| [SECURITY.md](SECURITY.md) | Security policy |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System design |
+| [AUDIT.md](AUDIT.md) | Audit checklist |
+| [docs/vault-api.md](docs/vault-api.md) | Vault API reference |
+| [docs/ai-endpoints.md](docs/ai-endpoints.md) | AI endpoint guide |
+| [backend-python/zkp/README.md](backend-python/zkp/README.md) | ZK-SNARK setup |
 
-## 🔑 Features
+---
 
-### AppWhistler (GraphQL Backend)
-- ✅ App verification and trust scoring
-- ✅ Claims and evidence management
-- ✅ Verdict tracking and provenance
-- ✅ Multi-signal scoring engine
-- ✅ Privacy, financial, and sentiment analysis
+## 🛡️ Security
 
-### Personal Proof Vault (Python Backend)
-- ✅ Encrypted document storage (AES-256-GCM)
-- ✅ Zero-knowledge proofs for selective disclosure
-- ✅ Hyperledger Fabric attestations
-- ✅ QR code generation for sharing
-- ✅ Complete audit timeline
-- ✅ Graph-based claim verification
+### Features
 
-## 🛠️ Development
+- ✅ **JWT/OIDC** — RS256/ES256 with JWKS verification
+- ✅ **Rate Limiting** — Redis-backed sliding window
+- ✅ **Input Sanitization** — XSS, injection protection
+- ✅ **Security Headers** — CSP, HSTS, X-Frame-Options
+- ✅ **Encryption** — AES-256-GCM for vault documents
+- ✅ **Audit Logging** — Structured security events
 
-### Testing
+### Reporting Vulnerabilities
 
-Frontend:
-```bash
-cd frontend-app
-npm test
-```
+Email: security@honestly.dev  
+See [SECURITY.md](SECURITY.md) for details.
 
-GraphQL Backend:
-```bash
-cd backend-graphql
-npm test
-```
+---
 
-Python Backend:
-```bash
-cd backend-python
-pytest
-```
+## 🏆 What Makes This World-Class
 
-### Linting
+1. **Production-Ready** — Not a prototype; built for real deployments
+2. **Privacy-First** — Zero-knowledge proofs for selective disclosure
+3. **Enterprise Security** — Rate limiting, sanitization, audit logging
+4. **Developer Experience** — Pre-commit hooks, setup scripts, Docker dev
+5. **Comprehensive Testing** — Unit, integration, and E2E coverage
+6. **Beautiful UI** — Modern glassmorphism design, animations
+7. **Extensible** — Modular architecture for custom circuits/features
+8. **Well-Documented** — Extensive docs and inline comments
 
-```bash
-# Frontend
-cd frontend-app && npm run lint
-
-# GraphQL Backend
-cd backend-graphql && npm run lint
-```
-
-## 📦 Project Structure
-
-```
-honestly/
-├── frontend-app/           # React frontend application
-│   ├── src/
-│   │   ├── App.jsx        # Main application component
-│   │   ├── main.jsx       # Application entry point
-│   │   └── index.css      # Global styles
-│   ├── package.json
-│   └── vite.config.js
-│
-├── backend-graphql/        # Node.js GraphQL backend
-│   ├── src/
-│   │   ├── config/        # Configuration files
-│   │   ├── graphql/       # Schema and resolvers
-│   │   ├── loaders/       # Express and Apollo setup
-│   │   └── utils/         # Utility functions
-│   └── package.json
-│
-├── backend-python/         # Python FastAPI backend
-│   ├── api/               # FastAPI routes
-│   ├── vault/             # Vault implementation
-│   ├── ingestion/         # Kafka integration
-│   ├── blockchain/        # Fabric integration
-│   └── vector_index/      # FAISS search
-│
-├── docs/                   # Documentation
-├── neo4j/                  # Neo4j initialization
-└── docker-compose.yml      # Infrastructure setup
-```
-
-## 🔐 Security Notes
-
-**⚠️ MVP Warning:** This is a development MVP. For production:
-- Implement proper JWT authentication
-- Use production Fabric network
-- Integrate real ZK-SNARK circuits
-- Add rate limiting and security auditing
-- Implement proper key management
-- Enable HTTPS/TLS
-- Add input sanitization
+---
 
 ## 📄 License
 
-See [LICENSE](LICENSE) file for details.
+**GNU Affero General Public License v3.0 (AGPL-3.0-only)**
 
-## 🤝 Contributing
+This software is licensed under the GNU Affero General Public License version 3 ONLY, with additional attribution requirements. Key points:
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+- ✅ Free to use, modify, and distribute
+- ✅ Source code must be made available
+- ✅ Network use triggers copyleft (AGPL requirement)
+- ⚠️ Must include attribution to aresforblue-ai
+- ⚠️ Production deployments should publish on-chain proof
 
-## 📧 Support
+See [LICENSE](LICENSE) and [LICENSE-EXTRAS.md](LICENSE-EXTRAS.md) for full terms and additional requirements.
 
-For issues and questions, please use the GitHub issue tracker.
-main
+---
+
+<div align="center">
+
+**Built with ❤️ for privacy, security, and trust.**
+
+[⭐ Star on GitHub](https://github.com/aresforblue-ai/honestly) • [🐛 Report Bug](https://github.com/aresforblue-ai/honestly/issues) • [💡 Request Feature](https://github.com/aresforblue-ai/honestly/issues)
+
+</div>

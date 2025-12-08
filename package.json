@@ -19,7 +19,7 @@
     "security"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "AGPL-3.0-only",
   "devDependencies": {
     "eslint": "^9.39.1",
     "jest": "^30.2.0"

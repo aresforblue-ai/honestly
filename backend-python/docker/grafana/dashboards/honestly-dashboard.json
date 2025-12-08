@@ -1,0 +1,132 @@
+{
+  "dashboard": {
+    "title": "Honestly Production Dashboard",
+    "panels": [
+      {
+        "title": "P95 Response Time",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "P95"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Response Time"
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 0.2,
+            "colorMode": "critical",
+            "op": "gt"
+          }
+        ]
+      },
+      {
+        "title": "P99 Response Time",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "P99"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Response Time"
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 0.2,
+            "colorMode": "critical",
+            "op": "gt"
+          }
+        ]
+      },
+      {
+        "title": "Error Rate",
+        "targets": [
+          {
+            "expr": "rate(http_errors_total[5m]) / rate(http_requests_total[5m])",
+            "legendFormat": "Error Rate"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "percentunit",
+            "label": "Error Rate"
+          }
+        ]
+      },
+      {
+        "title": "Request Rate",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{method}} {{endpoint}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "reqps",
+            "label": "Requests/sec"
+          }
+        ]
+      },
+      {
+        "title": "ZK Proof Verification Time",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.99, rate(zk_proof_verification_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{circuit_type}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Verification Time"
+          }
+        ]
+      },
+      {
+        "title": "Cache Hit Rate",
+        "targets": [
+          {
+            "expr": "rate(cache_hits_total[5m]) / (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m]))",
+            "legendFormat": "Hit Rate"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "percentunit",
+            "label": "Hit Rate"
+          }
+        ]
+      },
+      {
+        "title": "System Health",
+        "targets": [
+          {
+            "expr": "neo4j_health",
+            "legendFormat": "Neo4j"
+          },
+          {
+            "expr": "redis_health",
+            "legendFormat": "Redis"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "Health (1=healthy)"
+          }
+        ]
+      }
+    ]
+  }
+}
+
+

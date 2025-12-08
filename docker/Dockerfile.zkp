@@ -1,0 +1,220 @@
+# Multi-stage Dockerfile for ZK-SNARK circuit compilation
+# Handles Level 3 circuits with C++ witness generation
+
+# ==============================================================================
+# Stage 1: Builder - Compile circuits and C++ witness generators
+# ==============================================================================
+FROM node:18-bookworm AS builder
+
+# Install Circom dependencies + C++ toolchain
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    curl \
+    nlohmann-json3-dev \
+    libgmp-dev \
+    libsodium-dev \
+    nasm \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust (for Circom)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install Circom from source (latest stable)
+RUN git clone https://github.com/iden3/circom.git /tmp/circom \
+    && cd /tmp/circom \
+    && cargo build --release \
+    && cargo install --path circom \
+    && rm -rf /tmp/circom
+
+# ==============================================================================
+# Install Rapidsnark (high-performance Groth16 prover)
+# 5-10x faster than SnarkJS, sub-8GB RAM for 1M+ constraint circuits
+# ==============================================================================
+RUN git clone https://github.com/iden3/rapidsnark.git /tmp/rapidsnark \
+    && cd /tmp/rapidsnark \
+    && git submodule init \
+    && git submodule update \
+    && mkdir build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local \
+    && make -j$(nproc) \
+    && make install \
+    && rm -rf /tmp/rapidsnark
+
+# Verify rapidsnark installation
+RUN rapidsnark --version || echo "Rapidsnark installed (no version flag)"
+
+WORKDIR /zkp
+
+# Copy package files first (better caching)
+COPY backend-python/zkp/package*.json ./
+RUN npm ci
+
+# Copy circuit sources
+COPY backend-python/zkp/circuits ./circuits
+COPY backend-python/zkp/scripts ./scripts
+
+# Create artifacts directories
+RUN mkdir -p artifacts/common artifacts/age artifacts/authenticity \
+    artifacts/age_level3 artifacts/level3_inequality \
+    artifacts/agent_capability artifacts/agent_reputation
+
+# Download Powers of Tau (phase 1 ceremony)
+RUN curl -L https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_16.ptau \
+    -o artifacts/common/pot16_final.ptau
+
+# ==============================================================================
+# Build Simple Circuits (WASM OK, -O2)
+# ==============================================================================
+RUN circom circuits/age.circom \
+    --r1cs --wasm --sym -O2 \
+    -o artifacts/age \
+    -l node_modules
+
+RUN circom circuits/authenticity.circom \
+    --r1cs --wasm --sym -O2 \
+    -o artifacts/authenticity \
+    -l node_modules
+
+# ==============================================================================
+# Build Level 3 Circuits (C++ witness, -O2, high memory)
+# ==============================================================================
+ENV NODE_OPTIONS="--max-old-space-size=16384"
+
+# Age Level 3 - C++ witness generator
+RUN circom circuits/age_level3.circom \
+    --r1cs --sym -O2 --c \
+    -o artifacts/age_level3 \
+    -l node_modules \
+    && cd artifacts/age_level3/age_level3_cpp \
+    && make
+
+# Level 3 Inequality - C++ witness generator
+RUN circom circuits/Level3Inequality.circom \
+    --r1cs --sym -O2 --c \
+    -o artifacts/level3_inequality \
+    -l node_modules \
+    && cd artifacts/level3_inequality/Level3Inequality_cpp \
+    && make
+
+# ==============================================================================
+# Build AAIP Circuits (C++ witness, -O2)
+# ==============================================================================
+RUN circom circuits/agent_capability.circom \
+    --r1cs --sym -O2 --c \
+    -o artifacts/agent_capability \
+    -l node_modules \
+    && cd artifacts/agent_capability/agent_capability_cpp \
+    && make
+
+RUN circom circuits/agent_reputation.circom \
+    --r1cs --sym -O2 --c \
+    -o artifacts/agent_reputation \
+    -l node_modules \
+    && cd artifacts/agent_reputation/agent_reputation_cpp \
+    && make
+
+# AAIP Groth16 setup
+RUN npx snarkjs groth16 setup artifacts/agent_capability/agent_capability.r1cs artifacts/common/pot16_final.ptau artifacts/agent_capability/agent_capability_0000.zkey \
+    && npx snarkjs zkey contribute artifacts/agent_capability/agent_capability_0000.zkey artifacts/agent_capability/agent_capability_final.zkey -n "docker" -e="$(head -c 64 /dev/urandom | xxd -p)" \
+    && npx snarkjs zkey export verificationkey artifacts/agent_capability/agent_capability_final.zkey artifacts/agent_capability/verification_key.json
+
+RUN npx snarkjs groth16 setup artifacts/agent_reputation/agent_reputation.r1cs artifacts/common/pot16_final.ptau artifacts/agent_reputation/agent_reputation_0000.zkey \
+    && npx snarkjs zkey contribute artifacts/agent_reputation/agent_reputation_0000.zkey artifacts/agent_reputation/agent_reputation_final.zkey -n "docker" -e="$(head -c 64 /dev/urandom | xxd -p)" \
+    && npx snarkjs zkey export verificationkey artifacts/agent_reputation/agent_reputation_final.zkey artifacts/agent_reputation/verification_key.json
+
+# ==============================================================================
+# Groth16 Setup (generate proving/verification keys)
+# ==============================================================================
+COPY backend-python/zkp/snark-runner.js ./
+
+# Simple circuits
+RUN npx snarkjs groth16 setup artifacts/age/age.r1cs artifacts/common/pot16_final.ptau artifacts/age/age_0000.zkey \
+    && npx snarkjs zkey contribute artifacts/age/age_0000.zkey artifacts/age/age_final.zkey -n "docker" -e="$(head -c 64 /dev/urandom | xxd -p)" \
+    && npx snarkjs zkey export verificationkey artifacts/age/age_final.zkey artifacts/age/verification_key.json
+
+RUN npx snarkjs groth16 setup artifacts/authenticity/authenticity.r1cs artifacts/common/pot16_final.ptau artifacts/authenticity/authenticity_0000.zkey \
+    && npx snarkjs zkey contribute artifacts/authenticity/authenticity_0000.zkey artifacts/authenticity/authenticity_final.zkey -n "docker" -e="$(head -c 64 /dev/urandom | xxd -p)" \
+    && npx snarkjs zkey export verificationkey artifacts/authenticity/authenticity_final.zkey artifacts/authenticity/verification_key.json
+
+# Level 3 circuits
+RUN npx snarkjs groth16 setup artifacts/age_level3/age_level3.r1cs artifacts/common/pot16_final.ptau artifacts/age_level3/age_level3_0000.zkey \
+    && npx snarkjs zkey contribute artifacts/age_level3/age_level3_0000.zkey artifacts/age_level3/age_level3_final.zkey -n "docker" -e="$(head -c 64 /dev/urandom | xxd -p)" \
+    && npx snarkjs zkey export verificationkey artifacts/age_level3/age_level3_final.zkey artifacts/age_level3/verification_key.json
+
+RUN npx snarkjs groth16 setup artifacts/level3_inequality/Level3Inequality.r1cs artifacts/common/pot16_final.ptau artifacts/level3_inequality/Level3Inequality_0000.zkey \
+    && npx snarkjs zkey contribute artifacts/level3_inequality/Level3Inequality_0000.zkey artifacts/level3_inequality/Level3Inequality_final.zkey -n "docker" -e="$(head -c 64 /dev/urandom | xxd -p)" \
+    && npx snarkjs zkey export verificationkey artifacts/level3_inequality/Level3Inequality_final.zkey artifacts/level3_inequality/verification_key.json
+
+# ==============================================================================
+# Stage 2: Runtime - Slim image with compiled artifacts + rapidsnark
+# ==============================================================================
+FROM node:18-slim AS runtime
+
+# Install runtime dependencies for C++ witness generators + rapidsnark
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgmp10 \
+    libsodium23 \
+    libgomp1 \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy rapidsnark binary from builder
+COPY --from=builder /usr/local/bin/rapidsnark /usr/local/bin/rapidsnark
+COPY --from=builder /usr/local/bin/prover /usr/local/bin/prover
+
+# Verify rapidsnark works
+RUN rapidsnark --version || echo "Rapidsnark ready"
+
+WORKDIR /zkp
+
+# Copy Node dependencies
+COPY --from=builder /zkp/node_modules ./node_modules
+COPY --from=builder /zkp/package*.json ./
+
+# Copy compiled artifacts (skip intermediate .r1cs, keep final)
+COPY --from=builder /zkp/artifacts/age/*.wasm ./artifacts/age/
+COPY --from=builder /zkp/artifacts/age/*_final.zkey ./artifacts/age/
+COPY --from=builder /zkp/artifacts/age/verification_key.json ./artifacts/age/
+
+COPY --from=builder /zkp/artifacts/authenticity/*.wasm ./artifacts/authenticity/
+COPY --from=builder /zkp/artifacts/authenticity/*_final.zkey ./artifacts/authenticity/
+COPY --from=builder /zkp/artifacts/authenticity/verification_key.json ./artifacts/authenticity/
+
+# Level 3 - Copy C++ binaries + zkeys
+COPY --from=builder /zkp/artifacts/age_level3/age_level3_cpp/age_level3 ./artifacts/age_level3/
+COPY --from=builder /zkp/artifacts/age_level3/*_final.zkey ./artifacts/age_level3/
+COPY --from=builder /zkp/artifacts/age_level3/verification_key.json ./artifacts/age_level3/
+
+COPY --from=builder /zkp/artifacts/level3_inequality/Level3Inequality_cpp/Level3Inequality ./artifacts/level3_inequality/
+COPY --from=builder /zkp/artifacts/level3_inequality/*_final.zkey ./artifacts/level3_inequality/
+COPY --from=builder /zkp/artifacts/level3_inequality/verification_key.json ./artifacts/level3_inequality/
+
+# AAIP circuits - Copy C++ binaries + zkeys
+COPY --from=builder /zkp/artifacts/agent_capability/agent_capability_cpp/agent_capability ./artifacts/agent_capability/
+COPY --from=builder /zkp/artifacts/agent_capability/*_final.zkey ./artifacts/agent_capability/
+COPY --from=builder /zkp/artifacts/agent_capability/verification_key.json ./artifacts/agent_capability/
+
+COPY --from=builder /zkp/artifacts/agent_reputation/agent_reputation_cpp/agent_reputation ./artifacts/agent_reputation/
+COPY --from=builder /zkp/artifacts/agent_reputation/*_final.zkey ./artifacts/agent_reputation/
+COPY --from=builder /zkp/artifacts/agent_reputation/verification_key.json ./artifacts/agent_reputation/
+
+# Copy runner scripts
+COPY backend-python/zkp/snark-runner.js ./
+COPY backend-python/zkp/poseidon-hash.js ./
+COPY backend-python/zkp/rapidsnark_prover.py ./
+
+# Set memory for runtime proving
+ENV NODE_OPTIONS="--max-old-space-size=8192"
+ENV RAPIDSNARK_BIN="/usr/local/bin/rapidsnark"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD rapidsnark --version || node -e "require('snarkjs')" || exit 1
+
+# Default: keep container running for volume mounts
+CMD ["tail", "-f", "/dev/null"]
+

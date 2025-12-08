@@ -1,0 +1,476 @@
+# Grafana Alert Rules for Proof-of-Human
+# 
+# Import this via Grafana provisioning or the UI
+# These rules monitor critical metrics and trigger alerts
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: proof-of-human-critical
+    folder: Proof-of-Human
+    interval: 1m
+    rules:
+      # =================================================================
+      # Latency Alerts
+      # =================================================================
+      - uid: poh-p99-latency
+        title: API p99 Latency > 200ms
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) * 1000
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [200]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              refId: C
+              type: threshold
+        dashboardUid: proof-of-human-main
+        panelId: 2
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: API latency is above target (p99 > 200ms)
+          description: "Current p99 latency: {{ $value }}ms. Target: <200ms"
+        labels:
+          severity: warning
+        isPaused: false
+
+      # =================================================================
+      # Error Rate Alerts
+      # =================================================================
+      - uid: poh-error-rate
+        title: Error Rate > 1%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) * 100
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: Error rate exceeded 1%
+          description: "Current error rate: {{ $value }}%. Target: <1%"
+        labels:
+          severity: critical
+        isPaused: false
+
+      # =================================================================
+      # ZK Proof Alerts
+      # =================================================================
+      - uid: poh-proof-gen-slow
+        title: Proof Generation > 1s
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: histogram_quantile(0.99, sum(rate(zk_proof_generation_duration_seconds_bucket[5m])) by (le)) * 1000
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [1000]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: ZK proof generation is too slow
+          description: "Current p99: {{ $value }}ms. Target: <1000ms"
+        labels:
+          severity: warning
+        isPaused: false
+
+      - uid: poh-proof-verify-fail
+        title: Proof Verification Failures
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: sum(increase(zk_proof_verification_failure_total[5m]))
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [5]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: Multiple proof verification failures
+          description: "{{ $value }} verification failures in 5 minutes"
+        labels:
+          severity: critical
+        isPaused: false
+
+      # =================================================================
+      # Security Alerts
+      # =================================================================
+      - uid: poh-rate-limit-abuse
+        title: Rate Limit Abuse Detected
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: sum(increase(rate_limit_exceeded_total[5m]))
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [100]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: Potential rate limit abuse
+          description: "{{ $value }} rate limit hits in 5 minutes"
+        labels:
+          severity: warning
+        isPaused: false
+
+      - uid: poh-auth-failures
+        title: Authentication Failures Spike
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: sum(increase(auth_failures_total[5m]))
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [50]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: Potential brute force attack
+          description: "{{ $value }} auth failures in 5 minutes"
+        labels:
+          severity: critical
+        isPaused: false
+
+      # =================================================================
+      # Infrastructure Alerts
+      # =================================================================
+      - uid: poh-neo4j-down
+        title: Neo4j Connection Failed
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="neo4j"}
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: Neo4j database is down
+          description: "Neo4j connection lost. Check database health."
+        labels:
+          severity: critical
+        isPaused: false
+
+      - uid: poh-redis-down
+        title: Redis Connection Failed
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="redis"}
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: Redis cache is down
+          description: "Redis connection lost. Rate limiting may be degraded."
+        labels:
+          severity: warning
+        isPaused: false
+
+      # =================================================================
+      # Validation Test Alerts
+      # =================================================================
+      - uid: poh-security-audit-fail
+        title: Security Audit Failed
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: security_audit_status
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Security audit found issues
+          description: "Security validation failed. Check CI pipeline for details."
+        labels:
+          severity: critical
+        isPaused: false
+
+      - uid: poh-load-test-fail
+        title: Load Test Targets Missed
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: load_test_status
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Load test performance targets missed
+          description: "Weekly load test failed to meet p99 < 200ms or error rate < 1% targets."
+        labels:
+          severity: warning
+        isPaused: false
+

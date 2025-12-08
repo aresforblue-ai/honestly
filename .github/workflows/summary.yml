@@ -1,12 +1,16 @@
+# AI-powered issue summarization (requires GitHub Copilot/AI features enabled)
+# This workflow is disabled by default as it requires specific GitHub plan features
 name: Summarize new issues
 
 on:
-  issues:
-    types: [opened]
+  workflow_dispatch:  # Manual trigger only until AI inference is available
+  # issues:
+  #   types: [opened]
 
 jobs:
   summary:
     runs-on: ubuntu-latest
+    if: false  # Disabled: requires GitHub AI features
     permissions:
       issues: write
       models: read
@@ -19,6 +23,7 @@ jobs:
       - name: Run AI inference
         id: inference
         uses: actions/ai-inference@v1
+        continue-on-error: true
         with:
           prompt: |
             Summarize the following GitHub issue in one paragraph:
@@ -26,9 +31,9 @@ jobs:
             Body: ${{ github.event.issue.body }}
 
       - name: Comment with AI summary
+        if: steps.inference.outcome == 'success'
         run: |
           gh issue comment $ISSUE_NUMBER --body "$RESPONSE"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-          RESPONSE: ${{ steps.inference.outputs.response }}
