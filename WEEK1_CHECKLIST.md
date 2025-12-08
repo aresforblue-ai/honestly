@@ -13,7 +13,7 @@
 | 1 | ZK circuit .zkey files | ✅ DONE | - | 🔴 Critical |
 | 2 | GraphQL mock data | ✅ DONE | - | 🔴 Critical |
 | 3 | AgentCapability security | ✅ DONE | - | 🔴 Critical |
-| 4 | Dependency vulnerabilities | 🟡 TODO | 2-4h | 🟠 High |
+| 4 | Dependency vulnerabilities | 🟢 PARTIAL | 1h | 🟠 High |
 | 5 | 501 endpoints & TODOs | 🟡 TODO | 4-6h | 🟠 Medium |
 
 ---
