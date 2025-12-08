@@ -52,8 +52,10 @@ export function AnomalyDashboard() {
     critical: 0,
     warning: 0,
   });
+  const [isSimulating, setIsSimulating] = useState(false);
   
   const wsRef = useRef<WebSocket | null>(null);
+  const simulateIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -147,8 +149,84 @@ export function AnomalyDashboard() {
   // Connect on mount, cleanup on unmount
   useEffect(() => {
     connect();
-    return () => disconnect();
+    return () => {
+      disconnect();
+      if (simulateIntervalRef.current) clearInterval(simulateIntervalRef.current);
+    };
   }, [connect, disconnect]);
+
+  // Simulate zkML anomalies for dev testing
+  const simulateAnomaly = useCallback(() => {
+    const chains = [
+      { chain: "ethereum", prefix: "eth", color: "🔷" },
+      { chain: "solana", prefix: "sol", color: "🟣" },
+      { chain: "polygon", prefix: "poly", color: "🟪" },
+      { chain: "arbitrum", prefix: "arb", color: "🔵" },
+    ];
+    const agentTypes = ["gpt4", "claude", "llama", "mistral", "gemini"];
+    const flags = [
+      "rapid_score_change",
+      "unusual_pattern", 
+      "threshold_breach",
+      "cross_chain_drift",
+      "wormhole_relay",
+      "reputation_spike",
+    ];
+
+    const chain = chains[Math.floor(Math.random() * chains.length)];
+    const agentType = agentTypes[Math.floor(Math.random() * agentTypes.length)];
+    const score = 0.65 + Math.random() * 0.35;
+    const severity: "critical" | "warning" | "info" = 
+      score > 0.9 ? "critical" : score > 0.75 ? "warning" : "info";
+
+    // Generate fake zkML proof hash (looks like real Groth16)
+    const zkmlProofHash = "0x" + Array(64)
+      .fill(0)
+      .map(() => Math.floor(Math.random() * 16).toString(16))
+      .join("");
+
+    const anomaly: AnomalyEvent = {
+      type: "anomaly",
+      agent_id: `did:honestly:${chain.prefix}:agent:${agentType}-${Math.random().toString(36).slice(2, 8)}`,
+      anomaly_score: score,
+      threshold: 0.7,
+      flags: flags.filter(() => Math.random() > 0.6).slice(0, 3),
+      severity,
+      timestamp: new Date().toISOString(),
+      detection_time_ms: 30 + Math.random() * 200,
+      zkml_proof_hash: Math.random() > 0.3 ? zkmlProofHash : undefined,
+    };
+
+    // Add cross-chain metadata for Phase 4 preview
+    (anomaly as any).source_chain = chain.chain;
+    (anomaly as any).relay_protocol = Math.random() > 0.5 ? "wormhole" : "native";
+
+    setAnomalies(prev => [anomaly, ...prev].slice(0, 100));
+    setStats(prev => ({
+      total: prev.total + 1,
+      critical: prev.critical + (severity === "critical" ? 1 : 0),
+      warning: prev.warning + (severity === "warning" ? 1 : 0),
+    }));
+  }, []);
+
+  // Toggle simulation mode
+  const toggleSimulation = useCallback(() => {
+    if (isSimulating) {
+      if (simulateIntervalRef.current) {
+        clearInterval(simulateIntervalRef.current);
+        simulateIntervalRef.current = null;
+      }
+      setIsSimulating(false);
+    } else {
+      // Fire one immediately
+      simulateAnomaly();
+      // Then every 1.5-3 seconds
+      simulateIntervalRef.current = setInterval(() => {
+        if (Math.random() > 0.3) simulateAnomaly();
+      }, 1500 + Math.random() * 1500);
+      setIsSimulating(true);
+    }
+  }, [isSimulating, simulateAnomaly]);
 
   // Severity badge color
   const getSeverityColor = (severity?: string, score?: number) => {
@@ -241,19 +319,43 @@ export function AnomalyDashboard() {
         </Card>
       </div>
 
-      {/* Filter Buttons */}
-      <div className="flex gap-2">
-        {(["all", "critical", "warning"] as const).map((f) => (
+      {/* Filter Buttons + Simulate */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
+          {(["all", "critical", "warning"] as const).map((f) => (
+            <Button
+              key={f}
+              variant={filter === f ? "default" : "outline"}
+              size="sm"
+              onClick={() => subscribe(f)}
+              className={filter === f ? "bg-violet-600 hover:bg-violet-700" : "border-zinc-700 text-zinc-400"}
+            >
+              {f === "all" ? "All" : f === "critical" ? "🚨 Critical" : "⚠️ Warning"}
+            </Button>
+          ))}
+        </div>
+        
+        {/* Dev Simulate Controls */}
+        <div className="flex gap-2">
           <Button
-            key={f}
-            variant={filter === f ? "default" : "outline"}
+            variant="outline"
             size="sm"
-            onClick={() => subscribe(f)}
-            className={filter === f ? "bg-violet-600 hover:bg-violet-700" : "border-zinc-700 text-zinc-400"}
+            onClick={simulateAnomaly}
+            className="border-emerald-700 text-emerald-400 hover:bg-emerald-900/30"
           >
-            {f === "all" ? "All" : f === "critical" ? "🚨 Critical" : "⚠️ Warning"}
+            ⚡ Fire Once
           </Button>
-        ))}
+          <Button
+            variant={isSimulating ? "destructive" : "outline"}
+            size="sm"
+            onClick={toggleSimulation}
+            className={isSimulating 
+              ? "bg-orange-600 hover:bg-orange-700 animate-pulse" 
+              : "border-orange-700 text-orange-400 hover:bg-orange-900/30"}
+          >
+            {isSimulating ? "⏹ Stop Sim" : "▶ Auto Simulate"}
+          </Button>
+        </div>
       </div>
 
       {/* Anomaly Feed */}
@@ -321,12 +423,30 @@ export function AnomalyDashboard() {
                     </div>
                   </div>
                   
-                  {anomaly.zkml_proof_hash && (
-                    <div className="mt-3 pt-3 border-t border-zinc-700">
-                      <span className="text-xs text-zinc-500">zkML Proof: </span>
-                      <code className="text-xs text-violet-400 font-mono">
-                        {anomaly.zkml_proof_hash.slice(0, 16)}...
-                      </code>
+                  {/* Cross-chain & zkML info */}
+                  {(anomaly.zkml_proof_hash || (anomaly as any).source_chain) && (
+                    <div className="mt-3 pt-3 border-t border-zinc-700 flex flex-wrap gap-4">
+                      {(anomaly as any).source_chain && (
+                        <div>
+                          <span className="text-xs text-zinc-500">Chain: </span>
+                          <span className="text-xs text-cyan-400 font-medium capitalize">
+                            {(anomaly as any).source_chain}
+                          </span>
+                          {(anomaly as any).relay_protocol === "wormhole" && (
+                            <span className="ml-2 text-xs text-purple-400">
+                              🌀 Wormhole
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {anomaly.zkml_proof_hash && (
+                        <div>
+                          <span className="text-xs text-zinc-500">zkML: </span>
+                          <code className="text-xs text-violet-400 font-mono">
+                            {anomaly.zkml_proof_hash.slice(0, 16)}...
+                          </code>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
