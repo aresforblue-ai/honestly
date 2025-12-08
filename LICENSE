@@ -1,21 +1,108 @@
-MIT License
+GNU AFFERO GENERAL PUBLIC LICENSE
+Version 3, 19 November 2007
 
-Copyright (c) 2025 Tyler 
+Copyright (C) 2025 aresforblue-ai
+Original Repository: https://github.com/aresforblue-ai/honestly
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, version 3 of the License ONLY.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+================================================================================
+ADDITIONAL TERMS UNDER SECTION 7 OF THE GNU AGPL v3
+================================================================================
+
+Pursuant to Section 7 of the GNU Affero General Public License version 3,
+the following additional terms apply to this work:
+
+1. MANDATORY ATTRIBUTION REQUIREMENT
+   
+   All copies, modifications, forks, or derivative works of this software,
+   whether in source or binary form, MUST retain and prominently display
+   the following attribution in all user interfaces, documentation, and
+   source code files:
+   
+   "Based on 'honestly' by aresforblue-ai
+    Original Repository: https://github.com/aresforblue-ai/honestly"
+   
+   This attribution must be:
+   - Visible in the application's primary About page, settings page, or 
+     similar prominent location where credits/licenses are typically shown
+   - Included in all README files and primary documentation
+   - Present in headers or comments of modified source files
+   - Displayed in web interface footer, credits section, or similar 
+     location where third-party attributions are shown
+
+2. ON-CHAIN PROOF OF USAGE REQUIREMENT (for production deployments)
+   
+   Any entity or individual deploying this software in a production 
+   environment or commercial context SHOULD (and is strongly encouraged to):
+   
+   a) Publish a cryptographic proof of usage on at least one of the
+      following blockchain networks:
+      - Ethereum Mainnet
+      - Base
+      - Arbitrum
+   
+   b) The on-chain proof MUST include:
+      - A reference to this repository URL
+      - The commit hash or version being used
+      - A timestamp of deployment
+      - The deployer's address or identifier
+   
+   c) The proof should be published using:
+      - A smart contract that logs usage events, OR
+      - An ERC-721 or ERC-1155 token with metadata referencing this work, OR
+      - A permanent on-chain message or transaction with OP_RETURN data
+   
+   d) A link or transaction ID to the on-chain proof SHOULD be submitted
+      to this repository through any of these methods:
+      - A pull request to the DEPLOYMENTS.md file (if it exists), OR
+      - An issue labeled "deployment-proof", OR
+      - Through the repository's contact mechanisms
+      
+      Note: While submission is strongly encouraged for transparency and
+      community awareness, the on-chain proof itself serves as the primary
+      record of compliance.
+
+3. NETWORK COPYLEFT
+   
+   If you run a modified version of this software on a server and allow
+   users to interact with it remotely through a computer network, you must
+   make the complete source code of your modified version available to
+   those users under the terms of this license.
+
+4. NO WARRANTY DISCLAIMER
+   
+   This software is provided "as-is" without any warranty. The authors
+   and copyright holders are not liable for any damages arising from its use.
+
+5. TERMINATION AND CURE
+   
+   Failure to comply with the attribution requirements constitutes a 
+   violation of this license. Upon notification of violation, you have 
+   30 days to cure the violation. If the violation is not cured within 
+   this period, your rights under this license automatically terminate.
+   
+   For on-chain proof requirements, good faith efforts to comply are 
+   recognized, and technical difficulties or blockchain network issues 
+   provide reasonable grounds for extension of compliance timelines.
+
+================================================================================
+FULL LICENSE TEXT
+================================================================================
+
+For the complete text of the GNU Affero General Public License v3, see:
+https://www.gnu.org/licenses/agpl-3.0.txt
+
+The full license text is incorporated here by reference and governs all
+use, modification, and distribution of this software, subject to the
+additional terms specified above.
