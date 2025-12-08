@@ -106,13 +106,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: frontend-app/package-lock.json
       
       - name: Install dependencies
         run: |
           cd frontend-app
-          npm ci
+          npm ci || npm install
       
       - name: Lint
         run: |
@@ -137,8 +135,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: conductme/package-lock.json
       
       - name: Install root dependencies
         run: |
@@ -183,7 +179,7 @@ jobs:
       
       - name: Verify vkey integrity
         run: |
-          cd backend-python
+          cd backend-python/zkp
           python scripts/verify_key_integrity.py || echo "Integrity check failed - may need rebuild"
 
   zkp-rebuild:

@@ -6,7 +6,6 @@ on:
     paths:
       - 'backend-python/zkp/circuits/**'
       - 'backend-python/zkp/scripts/**'
-      - 'backend-python/zkp/Makefile'
       - 'backend-python/zkp/package.json'
       - 'backend-python/zkp/poseidon-hash.js'
   pull_request:
@@ -14,7 +13,6 @@ on:
     paths:
       - 'backend-python/zkp/circuits/**'
       - 'backend-python/zkp/scripts/**'
-      - 'backend-python/zkp/Makefile'
       - 'backend-python/zkp/package.json'
       - 'backend-python/zkp/poseidon-hash.js'
 
@@ -63,8 +61,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-ptau-
 
+      - name: Install Circom
+        run: |
+          curl -sSL https://github.com/iden3/circom/releases/download/v2.1.6/circom-linux-amd64 -o /usr/local/bin/circom
+          chmod +x /usr/local/bin/circom
+          circom --version
+
       - name: Install dependencies
-        if: steps.cache-npm.outputs.cache-hit != 'true'
         run: |
           cd backend-python/zkp
           npm install
@@ -79,7 +82,12 @@ jobs:
       - name: Rebuild all circuits
         run: |
           cd backend-python/zkp
-          make zkp-rebuild
+          npm run build:age
+          npm run build:auth
+          npm run setup:age
+          npm run setup:auth
+          npm run vk:age
+          npm run vk:auth
 
       - name: Install Python dependencies
         run: |
