@@ -21,12 +21,119 @@ pub mod VERIDICUS {
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let state = &mut ctx.accounts.state;
         state.authority = ctx.accounts.authority.key();
+        state.pending_authority = None;
+        state.authority_transfer_timestamp = None;
         state.total_supply = 1_000_000_000_000_000; // 1M VERIDICUS (1,000,000 * 10^9 decimals)
         state.total_burned = 0;
         state.total_jobs = 0;
         state.paused = false; // Start unpaused
         
         msg!("VERIDICUS program initialized");
+        Ok(())
+    }
+
+    /// Initiate authority transfer with 7-day timelock
+    /// This allows the current authority to propose a new authority (e.g., multisig DAO)
+    /// The transfer can only be completed after 7 days, giving the community time to react
+    pub fn transfer_authority(
+        ctx: Context<TransferAuthority>,
+        new_authority: Pubkey,
+    ) -> Result<()> {
+        let state = &mut ctx.accounts.state;
+        
+        // Check no pending transfer exists
+        require!(
+            state.pending_authority.is_none(),
+            VERIDICUSError::AuthorityTransferPending
+        );
+        
+        // Cannot transfer to same authority
+        require!(
+            new_authority != state.authority,
+            VERIDICUSError::InvalidNewAuthority
+        );
+        
+        // Cannot transfer to zero address
+        require!(
+            new_authority != Pubkey::default(),
+            VERIDICUSError::InvalidNewAuthority
+        );
+        
+        // Set pending authority and timestamp
+        state.pending_authority = Some(new_authority);
+        state.authority_transfer_timestamp = Some(Clock::get()?.unix_timestamp);
+        
+        emit!(AuthorityTransferInitiated {
+            current_authority: state.authority,
+            new_authority,
+            timestamp: state.authority_transfer_timestamp.unwrap(),
+        });
+        
+        msg!("Authority transfer initiated. New authority: {}. Timelock: 7 days", new_authority);
+        Ok(())
+    }
+
+    /// Accept authority transfer (can only be called after timelock expires)
+    /// The new authority must call this to complete the transfer
+    pub fn accept_authority(ctx: Context<AcceptAuthority>) -> Result<()> {
+        let state = &mut ctx.accounts.state;
+        
+        // Check pending transfer exists
+        let pending_authority = state.pending_authority.ok_or(VERIDICUSError::NoAuthorityTransferPending)?;
+        let transfer_timestamp = state.authority_transfer_timestamp.ok_or(VERIDICUSError::NoAuthorityTransferPending)?;
+        
+        // Verify caller is the pending authority
+        require!(
+            ctx.accounts.new_authority.key() == pending_authority,
+            VERIDICUSError::Unauthorized
+        );
+        
+        // Check timelock has expired (7 days)
+        let current_time = Clock::get()?.unix_timestamp;
+        let elapsed = current_time.checked_sub(transfer_timestamp)
+            .ok_or(VERIDICUSError::AuthorityTransferTimelockNotExpired)?;
+        
+        require!(
+            elapsed >= VERIDICUSState::AUTHORITY_TRANSFER_DELAY,
+            VERIDICUSError::AuthorityTransferTimelockNotExpired
+        );
+        
+        // Transfer authority
+        let old_authority = state.authority;
+        state.authority = pending_authority;
+        state.pending_authority = None;
+        state.authority_transfer_timestamp = None;
+        
+        emit!(AuthorityTransferred {
+            old_authority,
+            new_authority: state.authority,
+            timestamp: current_time,
+        });
+        
+        msg!("Authority transferred from {} to {}", old_authority, state.authority);
+        Ok(())
+    }
+
+    /// Cancel pending authority transfer (only current authority can cancel)
+    pub fn cancel_authority_transfer(ctx: Context<CancelAuthorityTransfer>) -> Result<()> {
+        let state = &mut ctx.accounts.state;
+        
+        // Check pending transfer exists
+        require!(
+            state.pending_authority.is_some(),
+            VERIDICUSError::NoAuthorityTransferPending
+        );
+        
+        let cancelled_authority = state.pending_authority.unwrap();
+        state.pending_authority = None;
+        state.authority_transfer_timestamp = None;
+        
+        emit!(AuthorityTransferCancelled {
+            cancelled_authority,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+        
+        msg!("Authority transfer cancelled");
         Ok(())
     }
 
@@ -69,12 +176,12 @@ pub mod VERIDICUS {
         // Check if program is paused
         require!(!state.paused, VERIDICUSError::ProgramPaused);
         
-        // Calculate burn amount (1 VTS base + variable by qubits)
-        let base_burn = 1_000_000_000; // 1 VTS (9 decimals)
+        // Calculate burn amount (1 VDC base + variable by qubits)
+        let base_burn = 1_000_000_000; // 1 VDC (9 decimals)
         let qubit_burn = match qubits {
-            5 => 1_000_000_000,   // +1 VTS
-            10 => 2_000_000_000, // +2 VTS
-            20 => 5_000_000_000, // +5 VTS
+            5 => 1_000_000_000,   // +1 VDC
+            10 => 2_000_000_000, // +2 VDC
+            20 => 5_000_000_000, // +5 VDC
             _ => 0,
         };
         
@@ -191,11 +298,11 @@ pub mod VERIDICUS {
         let staking = &ctx.accounts.staking;
         
         let discount = if staking.amount >= 20_000_000_000_000 {
-            60  // 60% discount for 20K+ VTS
+            60  // 60% discount for 20K+ VDC
         } else if staking.amount >= 5_000_000_000_000 {
-            40  // 40% discount for 5K+ VTS
+            40  // 40% discount for 5K+ VDC
         } else if staking.amount >= 1_000_000_000_000 {
-            20  // 20% discount for 1K+ VTS
+            20  // 20% discount for 1K+ VDC
         } else {
             0
         };
@@ -322,6 +429,45 @@ pub struct GetFeeDiscount<'info> {
     pub user: AccountInfo<'info>,
 }
 
+#[derive(Accounts)]
+pub struct TransferAuthority<'info> {
+    #[account(
+        mut,
+        seeds = [b"VERIDICUS_state"],
+        bump,
+        has_one = authority @ VERIDICUSError::Unauthorized
+    )]
+    pub state: Account<'info, VERIDICUSState>,
+    
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct AcceptAuthority<'info> {
+    #[account(
+        mut,
+        seeds = [b"VERIDICUS_state"],
+        bump
+    )]
+    pub state: Account<'info, VERIDICUSState>,
+    
+    /// CHECK: Must be the pending authority
+    pub new_authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CancelAuthorityTransfer<'info> {
+    #[account(
+        mut,
+        seeds = [b"VERIDICUS_state"],
+        bump,
+        has_one = authority @ VERIDICUSError::Unauthorized
+    )]
+    pub state: Account<'info, VERIDICUSState>,
+    
+    pub authority: Signer<'info>,
+}
+
 // VERIDICUSState and Staking moved to state.rs - remove duplicate definitions
 
 #[event]
@@ -359,5 +505,25 @@ pub struct ProgramPaused {
 pub struct ProgramUnpaused {
     pub timestamp: i64,
     pub unpaused_by: Pubkey,
+}
+
+#[event]
+pub struct AuthorityTransferInitiated {
+    pub current_authority: Pubkey,
+    pub new_authority: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct AuthorityTransferred {
+    pub old_authority: Pubkey,
+    pub new_authority: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct AuthorityTransferCancelled {
+    pub cancelled_authority: Pubkey,
+    pub timestamp: i64,
 }
 

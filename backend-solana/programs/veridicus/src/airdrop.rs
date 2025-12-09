@@ -18,11 +18,13 @@ pub fn claim_airdrop(
         VERIDICUSError::InvalidProof
     );
     
-    // Check if already claimed
-    require!(
-        !airdrop.claimed.contains(&leaf),
-        VERIDICUSError::AlreadyClaimed
-    );
+    // Check if already claimed (using separate PDA per claim)
+    // This prevents unbounded growth - each claim has its own account
+    // With init_if_needed, if account exists and claimed=true, reject
+    // If account is new (claimed=false by default), allow claim
+    if ctx.accounts.claim_record.claimed {
+        return Err(VERIDICUSError::AlreadyClaimed.into());
+    }
     
     // Calculate immediate unlock (50% at launch)
     let immediate = amount / 2;
@@ -51,8 +53,10 @@ pub fn claim_airdrop(
     vesting.vesting_period = 6 * 30 * 24 * 60 * 60; // 6 months in seconds
     vesting.start_timestamp = Clock::get()?.unix_timestamp;
     
-    // Mark as claimed
-    airdrop.claimed.push(leaf);
+    // Mark as claimed (using separate PDA)
+    ctx.accounts.claim_record.claimed = true;
+    ctx.accounts.claim_record.leaf = leaf;
+    ctx.accounts.claim_record.claimed_at = Clock::get()?.unix_timestamp;
     
     emit!(AirdropClaimed {
         user: ctx.accounts.user.key(),
@@ -146,9 +150,21 @@ fn verify_merkle_proof(proof: &[[u8; 32]], leaf: &[u8; 32], root: &[u8; 32]) -> 
 }
 
 #[derive(Accounts)]
+#[instruction(leaf: [u8; 32])]
 pub struct ClaimAirdrop<'info> {
     #[account(mut, seeds = [b"airdrop"], bump)]
     pub airdrop: Account<'info, AirdropState>,
+    
+    /// Separate PDA per claim - prevents unbounded growth
+    /// Each claim gets its own account, so we never hit account size limits
+    #[account(
+        init_if_needed,
+        payer = user,
+        space = 8 + ClaimRecord::LEN,
+        seeds = [b"claim", leaf.as_ref()],
+        bump
+    )]
+    pub claim_record: Account<'info, ClaimRecord>,
     
     #[account(
         init_if_needed,
@@ -203,7 +219,25 @@ pub struct UnlockVested<'info> {
 #[account]
 pub struct AirdropState {
     pub merkle_root: [u8; 32],
-    pub claimed: Vec<[u8; 32]>,
+    // Removed: pub claimed: Vec<[u8; 32]> - This was unbounded and would break after ~312K claims
+    // Solution: Use separate ClaimRecord PDA per claim (see ClaimRecord struct below)
+}
+
+impl AirdropState {
+    pub const LEN: usize = 8 + 32; // discriminator + merkle_root
+}
+
+/// Separate account per claim - prevents unbounded growth
+/// Each claim is tracked in its own PDA, so we never hit Solana's 10MB account limit
+#[account]
+pub struct ClaimRecord {
+    pub claimed: bool,
+    pub leaf: [u8; 32], // Merkle leaf hash
+    pub claimed_at: i64, // Timestamp when claimed
+}
+
+impl ClaimRecord {
+    pub const LEN: usize = 1 + 32 + 8; // claimed bool + leaf + timestamp
 }
 
 #[account]
