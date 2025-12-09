@@ -1,0 +1,18 @@
+# Cloudflare Pages Configuration
+# This file configures the build and deployment settings for Cloudflare Pages
+
+name = "veridicus"
+compatibility_date = "2024-01-01"
+
+[env.production]
+name = "veridicus"
+compatibility_date = "2024-01-01"
+
+# Build configuration
+# Cloudflare Pages will use these settings automatically
+# Build command: npm run build
+# Output directory: .next
+
+# Pages configuration
+pages_build_output_dir = ".next"
+
