@@ -7,30 +7,32 @@ import json
 import hashlib
 from pathlib import Path
 
+
 def compute_vkey_hash(vkey_path: Path) -> str:
     """Compute SHA-256 hash of verification key."""
     with open(vkey_path, "r") as f:
         vkey_data = json.load(f)
-    
+
     # Sort keys for consistent hashing
     vkey_str = json.dumps(vkey_data, sort_keys=True)
     return hashlib.sha256(vkey_str.encode()).hexdigest()
+
 
 def verify_integrity(circuit: str, artifacts_dir: Path) -> bool:
     """Verify verification key integrity."""
     vkey_path = artifacts_dir / circuit / "verification_key.json"
     hash_path = artifacts_dir / circuit / "verification_key.sha256"
-    
+
     if not vkey_path.exists():
         print(f"❌ Verification key not found: {vkey_path}")
         return False
-    
+
     computed_hash = compute_vkey_hash(vkey_path)
-    
+
     if hash_path.exists():
         with open(hash_path, "r") as f:
             expected_hash = f.read().strip()
-        
+
         if computed_hash != expected_hash:
             print(f"❌ Integrity check FAILED for {circuit}")
             print(f"   Expected: {expected_hash}")
@@ -45,6 +47,7 @@ def verify_integrity(circuit: str, artifacts_dir: Path) -> bool:
             f.write(computed_hash)
         print(f"✅ Generated hash: {computed_hash}")
         return True
+
 
 def generate_hashes(artifacts_dir: Path, circuits):
     """Generate integrity hashes for all verification keys."""
@@ -65,17 +68,18 @@ def generate_hashes(artifacts_dir: Path, circuits):
             json.dump(integrity, f, indent=2)
         print("✅ Wrote INTEGRITY.json")
 
+
 if __name__ == "__main__":
     import sys
-    
+
     artifacts_dir = Path(__file__).parent.parent / "artifacts"
-    
+
     # Core circuits (always required)
     CORE_CIRCUITS = ["age", "authenticity", "age_level3", "level3_inequality"]
-    
+
     # AAIP circuits (optional, for AI agent identity)
     AAIP_CIRCUITS = ["agent_capability", "agent_reputation"]
-    
+
     # All circuits
     ALL_CIRCUITS = CORE_CIRCUITS + AAIP_CIRCUITS
 
@@ -97,7 +101,9 @@ if __name__ == "__main__":
                 if vkey_path.exists():
                     computed = compute_vkey_hash(vkey_path)
                     if computed != expected_hash:
-                        print(f"❌ MISMATCH {circuit}: expected {expected_hash[:16]}..., got {computed[:16]}...")
+                        print(
+                            f"❌ MISMATCH {circuit}: expected {expected_hash[:16]}..., got {computed[:16]}..."
+                        )
                         all_passed = False
                     else:
                         print(f"✅ {circuit}: {computed[:16]}...")
@@ -114,4 +120,3 @@ if __name__ == "__main__":
             if not verify_integrity(circuit, artifacts_dir):
                 all_passed = False
         sys.exit(0 if all_passed else 1)
-

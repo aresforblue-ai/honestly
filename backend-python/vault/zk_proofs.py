@@ -10,7 +10,6 @@ The service automatically selects the optimal backend based on circuit type.
 
 import json
 import logging
-import os
 import secrets
 import subprocess
 from datetime import datetime
@@ -31,7 +30,7 @@ RAPIDSNARK_CIRCUITS = {
 class ZKProofService:
     """
     Service for generating and verifying zkSNARK proofs.
-    
+
     Automatically uses rapidsnark for Level 3/AAIP circuits when available,
     falls back to SnarkJS otherwise.
     """
@@ -45,11 +44,12 @@ class ZKProofService:
         self.runner_path = Path(runner_path) if runner_path else base_dir / "snark-runner.js"
         self.use_rapidsnark = use_rapidsnark
         self._rapidsnark_prover = None
-        
+
         # Lazy-load rapidsnark prover
         if use_rapidsnark:
             try:
                 from zkp.rapidsnark_prover import RapidsnarkProver
+
                 self._rapidsnark_prover = RapidsnarkProver(artifacts_dir=base_dir / "artifacts")
                 if self._rapidsnark_prover._rapidsnark_available:
                     logger.info("Rapidsnark prover initialized successfully")
@@ -61,10 +61,7 @@ class ZKProofService:
 
     def _should_use_rapidsnark(self, circuit: str) -> bool:
         """Determine if rapidsnark should be used for this circuit."""
-        return (
-            self._rapidsnark_prover is not None
-            and circuit in RAPIDSNARK_CIRCUITS
-        )
+        return self._rapidsnark_prover is not None and circuit in RAPIDSNARK_CIRCUITS
 
     def _run(self, action: str, circuit: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Invoke the Node snark-runner with JSON payload via stdin."""
@@ -119,7 +116,7 @@ class ZKProofService:
 
         bundle = self._run("prove", "age", payload)
         public_inputs = bundle.get("namedSignals", {})
-        
+
         # Extract nullifier from public signals (last signal)
         nullifier = bundle.get("publicSignals", [])[-1] if bundle.get("publicSignals") else None
 
@@ -138,12 +135,12 @@ class ZKProofService:
     ) -> bool:
         """
         Verify zkSNARK age proof with nullifier check.
-        
+
         Args:
             proof_data: JSON string containing proof bundle
             public_inputs: JSON string containing public inputs (unused, kept for compatibility)
             check_nullifier: If True, check nullifier hasn't been used (one-time use)
-        
+
         Returns:
             True if proof is valid and nullifier not used, False otherwise
         """
@@ -156,26 +153,27 @@ class ZKProofService:
         public_signals = bundle.get("publicSignals", [])
         if not public_signals:
             return False
-        
+
         nullifier = public_signals[-1]
-        
+
         # Check nullifier hasn't been used (one-time use prevention)
         if check_nullifier:
             from vault.nullifier_storage import verify_nullifier_not_used, mark_nullifier_used
-            
+
             if not verify_nullifier_not_used(nullifier):
                 return False  # Nullifier already used
-        
+
         # Verify proof
         try:
             result = self._run("verify", "age", bundle)
             verified = bool(result.get("verified"))
-            
+
             # Mark nullifier as used AFTER successful verification
             if verified and check_nullifier:
                 from vault.nullifier_storage import mark_nullifier_used
+
                 mark_nullifier_used(nullifier)
-            
+
             return verified
         except Exception:
             return False
@@ -195,7 +193,9 @@ class ZKProofService:
         epoch: public epoch number (for freshness enforcement and nullifier purging)
         """
         if merkle_proof is None or merkle_positions is None:
-            raise ValueError("merkle_proof and merkle_positions are required for authenticity proofs")
+            raise ValueError(
+                "merkle_proof and merkle_positions are required for authenticity proofs"
+            )
 
         if len(merkle_proof) != len(merkle_positions):
             raise ValueError("merkle_proof and merkle_positions must have the same length")
@@ -211,7 +211,7 @@ class ZKProofService:
 
         bundle = self._run("prove", "authenticity", payload)
         public_inputs = bundle.get("namedSignals", {})
-        
+
         # Extract epoch and nullifier from public signals
         public_signals = bundle.get("publicSignals", [])
         epoch_out = int(public_signals[-2]) if len(public_signals) >= 2 else None
@@ -234,13 +234,13 @@ class ZKProofService:
     ) -> bool:
         """
         Verify zkSNARK authenticity proof with nullifier and epoch checks.
-        
+
         Args:
             proof_data: JSON string containing proof bundle
             public_inputs: JSON string containing public inputs (unused, kept for compatibility)
             check_nullifier: If True, check nullifier hasn't been used (one-time use)
             current_epoch: Current epoch number (for freshness enforcement)
-        
+
         Returns:
             True if proof is valid, nullifier not used, and epoch is current
         """
@@ -253,31 +253,32 @@ class ZKProofService:
         public_signals = bundle.get("publicSignals", [])
         if len(public_signals) < 2:
             return False
-        
+
         epoch_out = int(public_signals[-2])  # Second-to-last signal
         nullifier = public_signals[-1]  # Last signal
-        
+
         # Enforce freshness: require current epoch (if specified)
         if current_epoch is not None and epoch_out < current_epoch:
             return False  # Proof from old epoch
-        
+
         # Check nullifier hasn't been used (one-time use prevention)
         if check_nullifier:
             from vault.nullifier_storage import verify_nullifier_not_used, mark_nullifier_used
-            
+
             if not verify_nullifier_not_used(nullifier, epoch=epoch_out):
                 return False  # Nullifier already used
-        
+
         # Verify proof
         try:
             result = self._run("verify", "authenticity", bundle)
             verified = bool(result.get("verified"))
-            
+
             # Mark nullifier as used AFTER successful verification
             if verified and check_nullifier:
                 from vault.nullifier_storage import mark_nullifier_used
+
                 mark_nullifier_used(nullifier, epoch=epoch_out)
-            
+
             return verified
         except Exception:
             return False
@@ -346,7 +347,7 @@ class ZKProofService:
     ) -> Dict[str, Any]:
         """
         Generate proof that an AI agent has a specific capability.
-        
+
         Args:
             agent_id: Private agent identifier
             capability_hash: Public hash of capability to prove
@@ -354,7 +355,7 @@ class ZKProofService:
             capabilities: Private list of agent's capability hashes (8 elements)
             agent_commitment: Public commitment to agent identity
             timestamp: Proof timestamp (default: now)
-        
+
         Returns:
             Proof bundle with nullifier for replay prevention
         """
@@ -405,7 +406,7 @@ class ZKProofService:
     ) -> Dict[str, Any]:
         """
         Generate proof that an AI agent's reputation exceeds a threshold.
-        
+
         Args:
             reputation_score: Private actual reputation (0-100)
             threshold: Public minimum reputation to prove
@@ -413,7 +414,7 @@ class ZKProofService:
             interaction_count: Private total interactions
             positive_count: Private positive interactions
             timestamp: Proof timestamp (default: now)
-        
+
         Returns:
             Proof bundle with nullifier and reputation commitment
         """
@@ -459,12 +460,12 @@ class ZKProofService:
     ) -> bool:
         """
         Verify an AAIP agent proof (capability or reputation).
-        
+
         Args:
             proof_data: JSON string containing proof bundle
             circuit: Circuit name (agent_capability or agent_reputation)
             check_nullifier: If True, check nullifier hasn't been used
-        
+
         Returns:
             True if proof is valid and nullifier not used
         """
@@ -482,6 +483,7 @@ class ZKProofService:
         # Check nullifier
         if check_nullifier:
             from vault.nullifier_storage import verify_nullifier_not_used, mark_nullifier_used
+
             if not verify_nullifier_not_used(nullifier):
                 return False
 
@@ -496,9 +498,9 @@ class ZKProofService:
 
             if verified and check_nullifier:
                 from vault.nullifier_storage import mark_nullifier_used
+
                 mark_nullifier_used(nullifier)
 
             return verified
         except Exception:
             return False
-

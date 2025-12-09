@@ -1,6 +1,7 @@
 """
 REST endpoints for vault operations (file uploads, share links, QR codes).
 """
+
 import os
 import base64
 import secrets
@@ -24,9 +25,9 @@ from api.auth import get_current_user
 from datetime import datetime
 
 # Initialize services
-NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
-NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
-NEO4J_PASS = os.getenv('NEO4J_PASS', 'test')
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASS = os.getenv("NEO4J_PASS", "test")
 PUBLIC_RATE_LIMIT_WINDOW = int(os.getenv("PUBLIC_RATE_LIMIT_WINDOW", "60"))
 PUBLIC_RATE_LIMIT_MAX = int(os.getenv("PUBLIC_RATE_LIMIT_MAX", "20"))
 
@@ -50,7 +51,10 @@ def _check_rate_limit(key: str):
     _rate_bucket[key] = bucket
     if bucket["count"] > PUBLIC_RATE_LIMIT_MAX:
         logger.warning("rate_limit_exceeded", extra={"key": key, "count": bucket["count"]})
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded"
+        )
+
 
 router = APIRouter(prefix="/vault", tags=["vault"])
 
@@ -64,29 +68,30 @@ async def upload_document(
 ):
     """
     Upload a document to the vault.
-    
+
     Returns document ID and hash.
     """
     uid = user["user_id"]
-    
+
     # Read file data
     file_data = await file.read()
-    
+
     # Parse document type
     try:
         doc_type = DocumentType[document_type.upper()]
     except KeyError:
         doc_type = DocumentType.OTHER
-    
+
     # Parse metadata
     import json
+
     meta = {}
     if metadata:
         try:
             meta = json.loads(metadata)
         except Exception:
             pass
-    
+
     # Upload and encrypt document
     document = vault_storage.upload_document(
         user_id=uid,
@@ -94,29 +99,28 @@ async def upload_document(
         document_type=doc_type,
         file_name=file.filename,
         mime_type=file.content_type,
-        metadata=meta
+        metadata=meta,
     )
-    
+
     # Anchor to Fabric
     try:
         anchor_result = fabric_client.anchor_document(
-            document_id=document.id,
-            document_hash=document.hash
+            document_id=document.id, document_hash=document.hash
         )
-        fabric_tx_id = anchor_result.get('transactionId')
+        fabric_tx_id = anchor_result.get("transactionId")
     except Exception as e:
         logger.warning("fabric_anchor_failed", extra={"error": str(e), "document_id": document.id})
         fabric_tx_id = None
-    
+
     # Persist to Neo4j
     from datetime import datetime
     from py2neo import Node, Relationship
-    
+
     tx = graph.begin()
-    
+
     user_node = Node("User", id=uid)
     tx.merge(user_node, "User", "id")
-    
+
     doc_props = {
         "id": document.id,
         "user_id": uid,
@@ -125,32 +129,32 @@ async def upload_document(
         "file_name": file.filename,
         "mime_type": file.content_type,
         "size_bytes": len(file_data),
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": datetime.utcnow().isoformat(),
     }
     if meta:
         doc_props["metadata"] = json.dumps(meta)
-    
+
     doc_node = Node("Document", **doc_props)
     tx.merge(doc_node, "Document", "id")
-    
+
     owns_rel = Relationship(user_node, "OWNS", doc_node)
     tx.merge(owns_rel)
-    
+
     if fabric_tx_id:
         att_node = Node(
             "Attestation",
             id=f"att_{document.id}",
             document_id=document.id,
             fabric_tx_id=fabric_tx_id,
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.utcnow().isoformat(),
         )
         tx.merge(att_node, "Attestation", "id")
-        
+
         attests_rel = Relationship(att_node, "ATTESTS", doc_node)
         tx.merge(attests_rel)
-    
+
     tx.commit()
-    
+
     # Log timeline event
     timeline_service.log_event(
         user_id=uid,
@@ -160,15 +164,15 @@ async def upload_document(
         metadata={
             "document_type": doc_type.value,
             "file_name": file.filename,
-            "fabric_tx_id": fabric_tx_id
-        }
+            "fabric_tx_id": fabric_tx_id,
+        },
     )
-    
+
     return {
         "document_id": document.id,
         "hash": document.hash,
         "fabric_tx_id": fabric_tx_id,
-        "message": "Document uploaded and encrypted successfully"
+        "message": "Document uploaded and encrypted successfully",
     }
 
 
@@ -179,33 +183,35 @@ async def get_document(document_id: str, user=Depends(get_current_user)):
     Requires authentication.
     """
     uid = user["user_id"]
-    
+
     # Verify ownership
     query = """
     MATCH (u:User {id: $user_id})-[:OWNS]->(d:Document {id: $doc_id})
     RETURN d
     """
     results = graph.run(query, {"user_id": uid, "doc_id": document_id}).data()
-    
+
     if not results:
         raise HTTPException(status_code=404, detail="Document not found or access denied")
-    
+
     # Decrypt and return document
     try:
         doc_data = vault_storage.download_document(uid, document_id)
-        
+
         doc_meta = vault_storage.get_document_metadata(document_id)
-        
+
         return JSONResponse(
             content={
                 "document_id": document_id,
-                "file_name": doc_meta.get('file_name'),
-                "mime_type": doc_meta.get('mime_type'),
-                "data": base64.b64encode(doc_data).decode('utf-8')
+                "file_name": doc_meta.get("file_name"),
+                "mime_type": doc_meta.get("mime_type"),
+                "data": base64.b64encode(doc_data).decode("utf-8"),
             }
         )
     except Exception:
-        logger.exception("document_retrieve_failed", extra={"document_id": document_id, "user_id": uid})
+        logger.exception(
+            "document_retrieve_failed", extra={"document_id": document_id, "user_id": uid}
+        )
         raise HTTPException(status_code=500, detail="Failed to retrieve document")
 
 
@@ -217,51 +223,51 @@ async def verify_share_link(token: str, request: Request):
     _check_rate_limit(f"share:{request.client.host}")
 
     proof_link = share_link_service.validate_token(token)
-    
+
     if not proof_link:
         raise HTTPException(status_code=404, detail="Not found")
-    
+
     # Get document metadata
     doc_meta = vault_storage.get_document_metadata(proof_link.document_id)
     if not doc_meta:
         raise HTTPException(status_code=404, detail="Not found")
-    
+
     # Get attestation
     attestation = fabric_client.query_attestation(proof_link.document_id)
-    
+
     # Return data based on access level
     response_data = {
         "share_token": proof_link.share_token,
         "document_id": proof_link.document_id,
         "proof_type": proof_link.proof_type,
-        "access_level": proof_link.access_level.value
+        "access_level": proof_link.access_level.value,
     }
-    
+
     if proof_link.access_level.value == "PROOF_ONLY":
         # Only return proof-related data
-        response_data["document_hash"] = doc_meta.get('hash')
+        response_data["document_hash"] = doc_meta.get("hash")
         if attestation:
             response_data["attestation"] = {
-                "fabric_tx_id": attestation.get('fabricTxId'),
-                "merkle_root": attestation.get('merkleRoot'),
-                "timestamp": attestation.get('timestamp')
+                "fabric_tx_id": attestation.get("fabricTxId"),
+                "merkle_root": attestation.get("merkleRoot"),
+                "timestamp": attestation.get("timestamp"),
             }
-    
+
     elif proof_link.access_level.value == "METADATA":
         # Return metadata
-        response_data["metadata"] = doc_meta.get('metadata', {})
-        response_data["file_name"] = doc_meta.get('file_name')
-        response_data["mime_type"] = doc_meta.get('mime_type')
-        response_data["document_hash"] = doc_meta.get('hash')
-    
+        response_data["metadata"] = doc_meta.get("metadata", {})
+        response_data["file_name"] = doc_meta.get("file_name")
+        response_data["mime_type"] = doc_meta.get("mime_type")
+        response_data["document_hash"] = doc_meta.get("hash")
+
     elif proof_link.access_level.value == "FULL":
         # Return full document (requires additional auth in production)
         # For MVP, we'll return metadata only
-        response_data["metadata"] = doc_meta.get('metadata', {})
-        response_data["file_name"] = doc_meta.get('file_name')
-        response_data["mime_type"] = doc_meta.get('mime_type')
-        response_data["document_hash"] = doc_meta.get('hash')
-    
+        response_data["metadata"] = doc_meta.get("metadata", {})
+        response_data["file_name"] = doc_meta.get("file_name")
+        response_data["mime_type"] = doc_meta.get("mime_type")
+        response_data["document_hash"] = doc_meta.get("hash")
+
     return response_data
 
 
@@ -317,7 +323,7 @@ async def get_share_bundle(token: str, request: Request):
         "document_id": proof_link.document_id,
         "proof_type": proof_link.proof_type,
         "access_level": proof_link.access_level.value,
-        "document_hash": doc_meta.get('hash'),
+        "document_hash": doc_meta.get("hash"),
         "issued_at": datetime.utcnow().isoformat(),
         "expires_at": proof_link.expires_at.isoformat() if proof_link.expires_at else None,
         "max_accesses": proof_link.max_accesses,
@@ -327,7 +333,7 @@ async def get_share_bundle(token: str, request: Request):
             "vk_url": f"/zkp/artifacts/{proof_link.proof_type}/verification_key.json",
             "vk_sha256": get_verification_key_hash(proof_link.proof_type),
             "attestation": attestation or None,
-        }
+        },
     }
 
     if not bundle["verification"]["vk_sha256"]:
@@ -340,9 +346,8 @@ async def get_share_bundle(token: str, request: Request):
 
     # Cache the bundle
     cache_set(cache_key, bundle, ttl=60.0)
-    
+
     duration = time.time() - start_time
     record_metric("share_bundle", duration, success=True)
-    
-    return bundle
 
+    return bundle

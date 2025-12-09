@@ -3,6 +3,7 @@ OpenAPI/Swagger configuration for the Truth Engine API.
 
 Provides enhanced documentation, security schemes, and example responses.
 """
+
 from typing import Dict, Any
 
 # API Information
@@ -187,9 +188,9 @@ def customize_openapi_schema(app) -> Dict[str, Any]:
     """
     if app.openapi_schema:
         return app.openapi_schema
-    
+
     from fastapi.openapi.utils import get_openapi
-    
+
     openapi_schema = get_openapi(
         title=API_TITLE,
         version=API_VERSION,
@@ -197,17 +198,17 @@ def customize_openapi_schema(app) -> Dict[str, Any]:
         routes=app.routes,
         tags=API_TAGS,
     )
-    
+
     # Add security schemes
     openapi_schema["components"]["securitySchemes"] = SECURITY_SCHEMES
-    
+
     # Add server URLs
     openapi_schema["servers"] = [
         {"url": "/", "description": "Current server"},
         {"url": "http://localhost:8000", "description": "Local development"},
         {"url": "https://api.honestly.dev", "description": "Production"},
     ]
-    
+
     # Add contact and license info
     openapi_schema["info"]["contact"] = {
         "name": "Honestly Labs",
@@ -218,13 +219,12 @@ def customize_openapi_schema(app) -> Dict[str, Any]:
         "name": "MIT",
         "url": "https://opensource.org/licenses/MIT",
     }
-    
+
     # Add external docs
     openapi_schema["externalDocs"] = {
         "description": "Full Documentation",
         "url": "https://docs.honestly.dev",
     }
-    
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema
-

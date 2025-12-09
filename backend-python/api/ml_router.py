@@ -22,7 +22,7 @@ Usage:
         "agent_id": "did:honestly:agent:xyz",
         "include_zkml_proof": true
     }
-    
+
     # Response includes Kafka event ID if anomalous
 """
 
@@ -34,7 +34,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, status
+from fastapi import APIRouter, HTTPException, BackgroundTasks, status
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,7 @@ SEQ_LEN = int(os.getenv("ML_SEQ_LEN", "10"))
 # Try to import Kafka
 try:
     from kafka import KafkaProducer
+
     KAFKA_AVAILABLE = True
 except ImportError:
     KAFKA_AVAILABLE = False
@@ -66,6 +67,7 @@ try:
     from ml.neo4j_loader import Neo4jDataLoader
     from ml.zkml_prover import get_zkml_prover
     from ml.deepprove_integration import get_deepprove_zkml
+
     ML_AVAILABLE = True
 except ImportError as e:
     ML_AVAILABLE = False
@@ -73,16 +75,20 @@ except ImportError as e:
 
 # Alert service for Slack/Discord
 try:
-    from api.alerts import get_alert_service, alert_on_anomaly
+    from api.alerts import get_alert_service, alert_on_anomaly  # noqa: F401
+
     ALERTS_AVAILABLE = True
 except ImportError:
     ALERTS_AVAILABLE = False
+
     async def alert_on_anomaly(anomaly):
         return {"slack": False, "discord": False, "reason": "not_available"}
+
 
 # WebSocket manager for real-time streaming
 try:
     from api.websocket_router import get_connection_manager
+
     WS_AVAILABLE = True
 except ImportError:
     WS_AVAILABLE = False
@@ -91,9 +97,10 @@ except ImportError:
 # Try to import Neo4j
 try:
     from py2neo import Graph
-    NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
-    NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
-    NEO4J_PASS = os.getenv('NEO4J_PASS', 'test')
+
+    NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+    NEO4J_PASS = os.getenv("NEO4J_PASS", "test")
     neo4j_graph = Graph(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
     NEO4J_AVAILABLE = True
 except Exception as e:
@@ -132,25 +139,21 @@ async def publish_kafka_event(
 ) -> Optional[str]:
     """Publish event to Kafka topic."""
     producer = get_kafka_producer()
-    
+
     # Add metadata
     event["_timestamp"] = datetime.now(timezone.utc).isoformat()
     event["_topic"] = topic
-    
+
     if producer:
         try:
             future = producer.send(topic, key=key, value=event)
             # Don't block - fire and forget with callback
-            future.add_callback(
-                lambda m: logger.debug(f"Kafka event sent: {topic}:{key}")
-            )
-            future.add_errback(
-                lambda e: logger.error(f"Kafka send failed: {e}")
-            )
+            future.add_callback(lambda m: logger.debug(f"Kafka event sent: {topic}:{key}"))
+            future.add_errback(lambda e: logger.error(f"Kafka send failed: {e}"))
             return f"{topic}:{key}:{event['_timestamp']}"
         except Exception as e:
             logger.error(f"Kafka publish error: {e}")
-    
+
     # Fallback: log event
     logger.info(f"[KAFKA_EVENT] {topic}:{key} = {json.dumps(event)[:200]}")
     return f"logged:{topic}:{key}"
@@ -158,8 +161,10 @@ async def publish_kafka_event(
 
 # Request/Response Models
 
+
 class AnomalyDetectRequest(BaseModel):
     """Request for single agent anomaly detection."""
+
     agent_id: str = Field(..., min_length=1, max_length=200)
     include_zkml_proof: bool = Field(default=False, description="Generate zkML proof")
     threshold: float = Field(default=0.7, ge=0.0, le=1.0)
@@ -168,6 +173,7 @@ class AnomalyDetectRequest(BaseModel):
 
 class AnomalyBatchRequest(BaseModel):
     """Request for batch anomaly detection."""
+
     agent_ids: List[str] = Field(..., min_items=1, max_items=100)
     include_zkml_proof: bool = Field(default=False)
     threshold: float = Field(default=0.7, ge=0.0, le=1.0)
@@ -175,6 +181,7 @@ class AnomalyBatchRequest(BaseModel):
 
 class TrainModelRequest(BaseModel):
     """Request for model training."""
+
     epochs: int = Field(default=50, ge=10, le=500)
     batch_size: int = Field(default=32, ge=8, le=128)
     days: int = Field(default=30, ge=7, le=90)
@@ -183,6 +190,7 @@ class TrainModelRequest(BaseModel):
 
 class ZKMLProofRequest(BaseModel):
     """Request for zkML proof generation."""
+
     agent_id: str = Field(..., min_length=1, max_length=200)
     threshold: float = Field(default=0.8, ge=0.0, le=1.0)
     use_rapidsnark: bool = Field(default=True, description="Use Rapidsnark for faster proving")
@@ -191,6 +199,7 @@ class ZKMLProofRequest(BaseModel):
 
 class AnomalyResult(BaseModel):
     """Result of anomaly detection."""
+
     agent_id: str
     anomaly_score: float
     is_anomalous: bool
@@ -204,6 +213,7 @@ class AnomalyResult(BaseModel):
 
 class BatchResult(BaseModel):
     """Result of batch anomaly detection."""
+
     results: List[AnomalyResult]
     summary: Dict[str, Any]
     kafka_event_id: Optional[str] = None
@@ -211,32 +221,34 @@ class BatchResult(BaseModel):
 
 # Helper functions
 
+
 def fetch_agent_features(
     agent_id: str,
     seq_len: int = 10,
 ) -> List[List[float]]:
     """
     Fetch agent activity features from Neo4j.
-    
+
     Returns sequence of feature vectors for the agent.
     """
     if not NEO4J_AVAILABLE or neo4j_graph is None:
         # Generate synthetic features for testing
         import random
+
         return [
             [
                 random.uniform(40, 80),  # reputation
-                random.uniform(1, 5),     # claims
-                random.uniform(0.5, 2),   # proofs
-                random.uniform(0, 3),     # interactions
+                random.uniform(1, 5),  # claims
+                random.uniform(0.5, 2),  # proofs
+                random.uniform(0, 3),  # interactions
                 random.randint(8, 20) / 24,  # hour
-                random.randint(0, 6) / 7,    # day
-                random.gauss(100, 20),    # response time
-                random.gauss(0.02, 0.01), # error rate
+                random.randint(0, 6) / 7,  # day
+                random.gauss(100, 20),  # response time
+                random.gauss(0.02, 0.01),  # error rate
             ]
             for _ in range(seq_len)
         ]
-    
+
     try:
         # Query agent's recent activity
         query = """
@@ -256,43 +268,46 @@ def fetch_agent_features(
             act.response_time AS response_time,
             act.error_rate AS error_rate
         """
-        
-        results = neo4j_graph.run(query, {
-            "agent_id": agent_id,
-            "seq_len": seq_len,
-        }).data()
-        
+
+        results = neo4j_graph.run(
+            query,
+            {
+                "agent_id": agent_id,
+                "seq_len": seq_len,
+            },
+        ).data()
+
         if not results:
             # No activity found, return defaults
-            return [[50, 1, 0.5, 1, 12/24, 3/7, 100, 0.02]] * seq_len
-        
+            return [[50, 1, 0.5, 1, 12 / 24, 3 / 7, 100, 0.02]] * seq_len
+
         features = []
         for r in results:
-            features.append([
-                float(r.get("reputation") or 50),
-                float(r.get("claims") or 1),
-                float(r.get("proofs") or 0.5),
-                float(r.get("interactions") or 1),
-                float(r.get("hour") or 12) / 24,
-                float(r.get("day") or 3) / 7,
-                float(r.get("response_time") or 100),
-                float(r.get("error_rate") or 0.02),
-            ])
-        
+            features.append(
+                [
+                    float(r.get("reputation") or 50),
+                    float(r.get("claims") or 1),
+                    float(r.get("proofs") or 0.5),
+                    float(r.get("interactions") or 1),
+                    float(r.get("hour") or 12) / 24,
+                    float(r.get("day") or 3) / 7,
+                    float(r.get("response_time") or 100),
+                    float(r.get("error_rate") or 0.02),
+                ]
+            )
+
         # Pad if needed
         while len(features) < seq_len:
             features.append(features[-1] if features else [50, 1, 0.5, 1, 0.5, 0.5, 100, 0.02])
-        
+
         return features[:seq_len]
-        
+
     except Exception as e:
         logger.error(f"Neo4j query failed for {agent_id}: {e}")
         # Return synthetic data
         import random
-        return [
-            [50 + random.gauss(0, 10), 2, 1, 1, 0.5, 0.5, 100, 0.02]
-            for _ in range(seq_len)
-        ]
+
+        return [[50 + random.gauss(0, 10), 2, 1, 1, 0.5, 0.5, 100, 0.02] for _ in range(seq_len)]
 
 
 async def run_anomaly_detection(
@@ -311,7 +326,7 @@ async def run_anomaly_detection(
         "reconstruction_error": None,
         "zkml_proof": None,
     }
-    
+
     if not ML_AVAILABLE:
         # Fallback: simple heuristic
         avg_rep = sum(f[0] for f in features) / len(features)
@@ -321,27 +336,27 @@ async def run_anomaly_detection(
         if result["is_anomalous"]:
             result["flags"].append("high_variance")
         return result
-    
+
     try:
         # Try autoencoder first
         autoencoder = get_autoencoder()
         ae_result = autoencoder.detect_anomaly(features)
-        
+
         result["anomaly_score"] = ae_result.anomaly_score
         result["reconstruction_error"] = ae_result.reconstruction_error
         result["is_anomalous"] = ae_result.is_anomalous or ae_result.anomaly_score > threshold
-        
+
         # Also run heuristic detector for additional flags
         detector = get_detector()
         proof_data = {"publicSignals": [str(int(features[-1][0]))]}
         heuristic_result = detector.analyze_proof(proof_data, agent_id, "agent_reputation")
         result["flags"] = heuristic_result.flags
-        
+
         # Combine scores (weighted)
         combined_score = 0.6 * ae_result.anomaly_score + 0.4 * heuristic_result.anomaly_score
         result["anomaly_score"] = combined_score
         result["is_anomalous"] = combined_score > threshold
-        
+
         # Generate zkML proof if requested and anomalous
         if include_zkml and result["is_anomalous"]:
             try:
@@ -350,15 +365,16 @@ async def run_anomaly_detection(
                 result["zkml_proof"] = proof.to_dict()
             except Exception as e:
                 logger.warning(f"zkML proof generation failed: {e}")
-        
+
     except Exception as e:
         logger.error(f"Anomaly detection failed: {e}")
         result["flags"].append("detection_error")
-    
+
     return result
 
 
 # Endpoints
+
 
 @router.post("/anomaly-detect", response_model=AnomalyResult)
 async def detect_anomaly(
@@ -367,16 +383,16 @@ async def detect_anomaly(
 ):
     """
     Detect anomalies in agent behavior.
-    
+
     Runs LSTM autoencoder + heuristic analysis.
     Publishes to Kafka if anomalous.
     Optionally generates zkML proof.
     """
     start_time = time.perf_counter()
-    
+
     # Fetch agent features from Neo4j
     features = fetch_agent_features(request.agent_id, request.seq_len)
-    
+
     # Run detection
     result = await run_anomaly_detection(
         agent_id=request.agent_id,
@@ -384,10 +400,10 @@ async def detect_anomaly(
         threshold=request.threshold,
         include_zkml=request.include_zkml_proof,
     )
-    
+
     detection_time = (time.perf_counter() - start_time) * 1000
     result["detection_time_ms"] = round(detection_time, 2)
-    
+
     # Publish to Kafka if anomalous
     if result["is_anomalous"]:
         event = {
@@ -398,32 +414,32 @@ async def detect_anomaly(
             "detection_time_ms": result["detection_time_ms"],
             "action": "investigate",
         }
-        
+
         # Add zkML proof hash if available
         if result.get("zkml_proof"):
             event["zkml_proof_hash"] = result["zkml_proof"].get("model_hash")
-        
+
         event_id = await publish_kafka_event(
             topic=KAFKA_TOPIC_ANOMALY,
             key=request.agent_id,
             event=event,
         )
         result["kafka_event_id"] = event_id
-        
+
         # Send Slack/Discord alerts
         if ALERTS_AVAILABLE:
             background_tasks.add_task(alert_on_anomaly, event)
-        
+
         # Broadcast to WebSocket clients
         if WS_AVAILABLE and get_connection_manager:
             ws_manager = get_connection_manager()
             background_tasks.add_task(ws_manager.broadcast_anomaly, event)
-        
+
         logger.warning(
             f"ANOMALY DETECTED: agent={request.agent_id} "
             f"score={result['anomaly_score']:.3f} flags={result['flags']}"
         )
-    
+
     return AnomalyResult(**result)
 
 
@@ -434,14 +450,14 @@ async def detect_anomaly_batch(
 ):
     """
     Batch anomaly detection for multiple agents.
-    
+
     Processes agents in parallel, publishes summary to Kafka.
     """
     start_time = time.perf_counter()
-    
+
     results = []
     anomalous_count = 0
-    
+
     # Process in parallel using asyncio
     async def process_agent(agent_id: str) -> Dict[str, Any]:
         features = fetch_agent_features(agent_id)
@@ -451,30 +467,32 @@ async def detect_anomaly_batch(
             threshold=request.threshold,
             include_zkml=request.include_zkml_proof,
         )
-    
+
     # Run all detections concurrently
     tasks = [process_agent(agent_id) for agent_id in request.agent_ids]
     detection_results = await asyncio.gather(*tasks, return_exceptions=True)
-    
+
     for i, result in enumerate(detection_results):
         if isinstance(result, Exception):
-            results.append({
-                "agent_id": request.agent_ids[i],
-                "anomaly_score": 0.0,
-                "is_anomalous": False,
-                "threshold": request.threshold,
-                "flags": ["error"],
-                "detection_time_ms": 0,
-            })
+            results.append(
+                {
+                    "agent_id": request.agent_ids[i],
+                    "anomaly_score": 0.0,
+                    "is_anomalous": False,
+                    "threshold": request.threshold,
+                    "flags": ["error"],
+                    "detection_time_ms": 0,
+                }
+            )
         else:
             result["detection_time_ms"] = 0  # Will set total time
             results.append(result)
             if result["is_anomalous"]:
                 anomalous_count += 1
-    
+
     total_time = (time.perf_counter() - start_time) * 1000
     avg_time = total_time / len(request.agent_ids) if request.agent_ids else 0
-    
+
     summary = {
         "total_agents": len(request.agent_ids),
         "anomalous_count": anomalous_count,
@@ -484,13 +502,14 @@ async def detect_anomaly_batch(
         "avg_time_ms": round(avg_time, 2),
         "threshold": request.threshold,
     }
-    
+
     # Publish batch summary to Kafka
     event_id = None
     if anomalous_count > 0:
         anomalous_agents = [
             {"agent_id": r["agent_id"], "score": r["anomaly_score"]}
-            for r in results if r["is_anomalous"]
+            for r in results
+            if r["is_anomalous"]
         ]
         event = {
             "batch_id": f"batch_{int(time.time())}",
@@ -503,7 +522,7 @@ async def detect_anomaly_batch(
             key=f"batch_{len(request.agent_ids)}",
             event=event,
         )
-    
+
     return BatchResult(
         results=[AnomalyResult(**r) for r in results],
         summary=summary,
@@ -518,7 +537,7 @@ async def train_model(
 ):
     """
     Trigger model retraining on recent data.
-    
+
     Runs in background, publishes completion to Kafka.
     """
     if not ML_AVAILABLE:
@@ -526,11 +545,11 @@ async def train_model(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="ML modules not available",
         )
-    
+
     async def train_task():
         """Background training task."""
         start_time = time.perf_counter()
-        
+
         try:
             # Load training data
             loader = Neo4jDataLoader(neo4j_graph)
@@ -538,7 +557,7 @@ async def train_model(
                 days=request.days,
                 min_samples=request.min_samples,
             )
-            
+
             # Train autoencoder
             autoencoder = get_autoencoder()
             history = autoencoder.fit(
@@ -546,9 +565,9 @@ async def train_model(
                 epochs=request.epochs,
                 batch_size=request.batch_size,
             )
-            
+
             train_time = time.perf_counter() - start_time
-            
+
             # Publish completion event
             event = {
                 "status": "completed",
@@ -562,9 +581,9 @@ async def train_model(
                 key="autoencoder",
                 event=event,
             )
-            
+
             logger.info(f"Model training completed in {train_time:.2f}s")
-            
+
         except Exception as e:
             logger.error(f"Model training failed: {e}")
             await publish_kafka_event(
@@ -572,10 +591,10 @@ async def train_model(
                 key="autoencoder",
                 event={"status": "failed", "error": str(e)},
             )
-    
+
     # Run training in background
     background_tasks.add_task(train_task)
-    
+
     return {
         "status": "training_started",
         "epochs": request.epochs,
@@ -601,30 +620,30 @@ async def ml_status():
         },
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-    
+
     if ML_AVAILABLE:
         try:
             # Get detector stats
             detector = get_detector()
             status_info["heuristic_detector"] = detector.get_stats()
-            
+
             # Check autoencoder
             autoencoder = get_autoencoder()
             status_info["autoencoder"] = {
                 "type": type(autoencoder).__name__,
                 "ready": True,
             }
-            
+
             # Check zkML prover
             prover = get_zkml_prover()
             status_info["zkml_prover"] = {
                 "model_hash": prover.model_hash,
                 "circuit_compiled": prover._circuit_compiled,
             }
-            
+
         except Exception as e:
             status_info["error"] = str(e)
-    
+
     return status_info
 
 
@@ -636,14 +655,14 @@ async def kafka_health():
             "status": "unavailable",
             "reason": "kafka-python not installed",
         }
-    
+
     producer = get_kafka_producer()
     if producer is None:
         return {
             "status": "disconnected",
             "bootstrap_servers": KAFKA_BOOTSTRAP,
         }
-    
+
     # Try to get cluster metadata
     try:
         metadata = producer.bootstrap_connected()
@@ -668,22 +687,23 @@ async def kafka_health():
 # zkML Endpoints - Zero-Knowledge Machine Learning Proofs
 # ============================================================================
 
+
 @router.post("/zkml/prove")
 async def generate_zkml_proof(request: ZKMLProofRequest):
     """
     Generate a zkML proof of anomaly detection result.
-    
+
     Uses DeepProve to prove "reconstruction_error > threshold"
     without revealing:
     - Agent activity features
     - Model weights
     - Raw anomaly score
-    
+
     Only reveals:
     - Threshold used
     - Boolean: is_above_threshold
     - Model commitment (hash)
-    
+
     Output is Groth16-compatible for on-chain verification.
     """
     if not ML_AVAILABLE:
@@ -691,12 +711,12 @@ async def generate_zkml_proof(request: ZKMLProofRequest):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="ML modules not available",
         )
-    
+
     start_time = time.perf_counter()
-    
+
     # Fetch agent features
     features = fetch_agent_features(request.agent_id)
-    
+
     # Generate zkML proof
     try:
         zkml = get_deepprove_zkml()
@@ -705,9 +725,9 @@ async def generate_zkml_proof(request: ZKMLProofRequest):
             threshold=request.threshold,
             use_rapidsnark=request.use_rapidsnark,
         )
-        
+
         total_time = (time.perf_counter() - start_time) * 1000
-        
+
         # Publish to Kafka if anomalous
         kafka_event_id = None
         if proof.is_above_threshold:
@@ -724,7 +744,7 @@ async def generate_zkml_proof(request: ZKMLProofRequest):
                 key=f"zkml:{request.agent_id}",
                 event=event,
             )
-        
+
         return {
             "agent_id": request.agent_id,
             "proof": proof.to_dict(),
@@ -732,12 +752,12 @@ async def generate_zkml_proof(request: ZKMLProofRequest):
             "total_time_ms": round(total_time, 2),
             "kafka_event_id": kafka_event_id,
             "verification_command": (
-                f"npx snarkjs groth16 verify "
-                f"circuits/zkml/verification_key.json "
-                f"public.json proof.json"
+                "npx snarkjs groth16 verify "
+                "circuits/zkml/verification_key.json "
+                "public.json proof.json"
             ),
         }
-        
+
     except Exception as e:
         logger.error(f"zkML proof generation failed: {e}")
         raise HTTPException(
@@ -750,7 +770,7 @@ async def generate_zkml_proof(request: ZKMLProofRequest):
 async def verify_zkml_proof(proof_data: Dict[str, Any]):
     """
     Verify a zkML proof.
-    
+
     Accepts a proof in snarkjs/Groth16 format and verifies it
     against the circuit's verification key.
     """
@@ -759,10 +779,10 @@ async def verify_zkml_proof(proof_data: Dict[str, Any]):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="ML modules not available",
         )
-    
+
     try:
         from ml.deepprove_integration import DeepProveProof
-        
+
         # Reconstruct proof object
         proof_obj = proof_data.get("proof", {})
         proof = DeepProveProof(
@@ -774,17 +794,17 @@ async def verify_zkml_proof(proof_data: Dict[str, Any]):
             threshold_scaled=proof_data.get("metadata", {}).get("threshold_scaled", 0),
             is_above_threshold=proof_data.get("metadata", {}).get("is_above_threshold", False),
         )
-        
+
         # Verify
         zkml = get_deepprove_zkml()
         is_valid = zkml.verify(proof)
-        
+
         return {
             "valid": is_valid,
             "public_inputs": proof.public_inputs,
             "model_commitment": proof.model_commitment[:16] if proof.model_commitment else None,
         }
-        
+
     except Exception as e:
         logger.error(f"zkML verification failed: {e}")
         raise HTTPException(
@@ -800,10 +820,10 @@ async def setup_zkml_circuit(
 ):
     """
     Setup zkML circuit from ONNX model.
-    
+
     One-time setup that compiles the model to a ZK circuit
     and generates proving/verification keys.
-    
+
     This is a long-running operation (~5-10 minutes for complex models).
     """
     if not ML_AVAILABLE:
@@ -811,9 +831,9 @@ async def setup_zkml_circuit(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="ML modules not available",
         )
-    
+
     from pathlib import Path
-    
+
     model_path = Path(onnx_path)
     if not model_path.exists():
         # Try to export current autoencoder
@@ -827,13 +847,13 @@ async def setup_zkml_circuit(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Model not found and export failed: {e}",
             )
-    
+
     async def setup_task():
         """Background setup task."""
         try:
             zkml = get_deepprove_zkml()
             success = zkml.setup(model_path, optimize=True)
-            
+
             event = {
                 "status": "completed" if success else "failed",
                 "model_path": str(model_path),
@@ -851,7 +871,7 @@ async def setup_zkml_circuit(
                 key="zkml_setup",
                 event={"status": "failed", "error": str(e)},
             )
-    
+
     if background_tasks:
         background_tasks.add_task(setup_task)
         return {
@@ -877,11 +897,11 @@ async def zkml_status():
             "available": False,
             "reason": "ML modules not available",
         }
-    
+
     try:
         zkml = get_deepprove_zkml()
         stats = zkml.get_circuit_stats()
-        
+
         return {
             "available": True,
             "stats": stats,
@@ -896,4 +916,3 @@ async def zkml_status():
             "available": False,
             "error": str(e),
         }
-

@@ -2,6 +2,7 @@
 Shared utility functions for the API.
 Extracted to avoid circular imports between app.py and vault_routes.py.
 """
+
 import os
 import json
 import hashlib
@@ -11,7 +12,7 @@ from pathlib import Path
 from typing import Dict
 
 # Configuration
-HMAC_SECRET = os.getenv('BUNDLE_HMAC_SECRET')
+HMAC_SECRET = os.getenv("BUNDLE_HMAC_SECRET")
 
 # Verification key hashes cache
 _VERIFICATION_KEY_HASHES: Dict[str, str] = {}
@@ -29,9 +30,13 @@ def load_verification_key_hashes() -> None:
         "age": artifacts_dir / "age" / "verification_key.json",
         "authenticity": artifacts_dir / "authenticity" / "verification_key.json",
     }
-    missing_keys = [str(key_path) for key_path in required_verification_keys.values() if not key_path.exists()]
+    missing_keys = [
+        str(key_path) for key_path in required_verification_keys.values() if not key_path.exists()
+    ]
     if missing_keys:
-        raise RuntimeError(f"Missing verification keys: {missing_keys}. Run zkp build to generate real vkeys.")
+        raise RuntimeError(
+            f"Missing verification keys: {missing_keys}. Run zkp build to generate real vkeys."
+        )
     for circuit, key_path in required_verification_keys.items():
         key_data = key_path.read_bytes()
         _VERIFICATION_KEY_HASHES[circuit] = hashlib.sha256(key_data).hexdigest()
@@ -54,4 +59,3 @@ def hmac_sign(payload: dict) -> str:
 def verification_keys_ready() -> bool:
     """Check if all verification keys are loaded."""
     return all(_VERIFICATION_KEY_HASHES.get(circuit) for circuit in ("age", "authenticity"))
-

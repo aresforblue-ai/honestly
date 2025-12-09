@@ -7,6 +7,7 @@ These tests require:
 - a vectors file providing payloads: env ZK_TEST_VECTORS or default backend-python/zkp/test_vectors.json
 - enable with ZK_TESTS=1 (otherwise skipped)
 """
+
 import json
 import os
 import shutil
@@ -116,5 +117,3 @@ def test_field_overflow_rejected():
         pytest.skip("field_overflow vectors not provided")
     with pytest.raises(RuntimeError):
         run_runner("prove", vectors["circuit"], vectors["payload"])
-
-

@@ -9,6 +9,7 @@ Attempts to load the master key from (in order):
 Falls back to generated keys only when ALLOW_GENERATED_VAULT_KEY=true
 to avoid accidental production boot without a managed secret.
 """
+
 import base64
 import logging
 import os
@@ -16,6 +17,7 @@ from pathlib import Path
 from typing import Optional
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
 try:
     import requests
 except ImportError:  # pragma: no cover - optional dependency
@@ -92,4 +94,3 @@ def load_master_key(explicit_key: Optional[str] = None) -> bytes:
         "Set VAULT_ENCRYPTION_KEY (base64) or VAULT_KEY_FILE; "
         "for local dev set ALLOW_GENERATED_VAULT_KEY=true."
     )
-

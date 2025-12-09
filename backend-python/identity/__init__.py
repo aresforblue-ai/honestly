@@ -98,14 +98,12 @@ __all__ = [
     "verify_reputation_proof",
     "compute_model_fingerprint",
     "compute_system_prompt_hash",  # Hash system prompts for identity
-    
     # ZK Integration
     "AAIPZKIntegration",
     "ZKProofResult",
     "get_zkp_integration",
     "prove_agent_reputation_zk",
     "verify_agent_reputation_proof",
-    
     # Verifiable Credentials
     "VerifiableCredential",
     "VerifiablePresentation",
@@ -117,7 +115,6 @@ __all__ = [
     "create_education_credential",
     "create_proof_of_humanity_credential",
     "create_reputation_credential",
-    
     # Social Recovery
     "SocialRecoveryManager",
     "ShamirSecretSharing",
@@ -126,7 +123,6 @@ __all__ = [
     "Guardian",
     "RecoveryConfig",
     "create_recovery_setup",
-    
     # Cross-Chain Bridge
     "CrossChainBridge",
     "Chain",
@@ -139,4 +135,3 @@ __all__ = [
 ]
 
 __version__ = "1.0.0"
-

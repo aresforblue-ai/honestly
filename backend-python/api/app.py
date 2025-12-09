@@ -13,10 +13,7 @@ from sentence_transformers import SentenceTransformer
 from vector_index.faiss_index import FaissIndex
 
 # Import shared utilities (avoids circular imports)
-from api.utils import (
-    get_vkey_hash, vkeys_ready,
-    load_vkey_hashes, get_artifacts_dir
-)
+from api.utils import get_vkey_hash, vkeys_ready, load_vkey_hashes, get_artifacts_dir
 
 # Import vault resolvers and routes
 from api.vault_resolvers import query as vault_query, mutation as vault_mutation
@@ -29,6 +26,7 @@ from api.monitoring import router as monitoring_router
 # Import AI agent routers
 try:
     from api.ai_agents import router as ai_agents_router
+
     AI_AGENTS_AVAILABLE = True
 except ImportError:
     AI_AGENTS_AVAILABLE = False
@@ -36,6 +34,7 @@ except ImportError:
 
 try:
     from api.ml_router import router as ml_router
+
     ML_ROUTER_AVAILABLE = True
 except ImportError:
     ML_ROUTER_AVAILABLE = False
@@ -43,6 +42,7 @@ except ImportError:
 
 try:
     from api.websocket_router import router as ws_router
+
     WS_ROUTER_AVAILABLE = True
 except ImportError:
     WS_ROUTER_AVAILABLE = False
@@ -50,6 +50,7 @@ except ImportError:
 
 try:
     from api.alerts import get_alert_service
+
     ALERTS_AVAILABLE = True
 except ImportError:
     ALERTS_AVAILABLE = False
@@ -58,30 +59,33 @@ except ImportError:
 # Import Prometheus metrics
 try:
     from api.prometheus import get_metrics_endpoint
+
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
     get_metrics_endpoint = None
     print("Warning: prometheus_client not installed. Metrics disabled.")
 
-NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
-NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
-NEO4J_PASS = os.getenv('NEO4J_PASS', 'test')
-_DEFAULT_ORIGIN = 'http://localhost:5173'
-ALLOWED_ORIGINS = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', _DEFAULT_ORIGIN).split(',') if o.strip()]
-STRICT_CORS = os.getenv('STRICT_CORS', 'false').lower() == 'true'
-ENABLE_CORS = os.getenv('ENABLE_CORS', 'true').lower() != 'false'
-ENABLE_SECURITY_HEADERS = os.getenv('ENABLE_SECURITY_HEADERS', 'true').lower() != 'false'
-HSTS_MAX_AGE = int(os.getenv('HSTS_MAX_AGE', '31536000'))
-RATE_LIMIT_ENABLED = os.getenv('RATE_LIMIT_ENABLED', 'true').lower() != 'false'
-RATE_LIMIT_WINDOW = int(os.getenv('RATE_LIMIT_WINDOW', '60'))
-RATE_LIMIT_MAX = int(os.getenv('RATE_LIMIT_MAX', '60'))  # per window per IP for public/GraphQL
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASS = os.getenv("NEO4J_PASS", "test")
+_DEFAULT_ORIGIN = "http://localhost:5173"
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv("ALLOWED_ORIGINS", _DEFAULT_ORIGIN).split(",") if o.strip()
+]
+STRICT_CORS = os.getenv("STRICT_CORS", "false").lower() == "true"
+ENABLE_CORS = os.getenv("ENABLE_CORS", "true").lower() != "false"
+ENABLE_SECURITY_HEADERS = os.getenv("ENABLE_SECURITY_HEADERS", "true").lower() != "false"
+HSTS_MAX_AGE = int(os.getenv("HSTS_MAX_AGE", "31536000"))
+RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() != "false"
+RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
+RATE_LIMIT_MAX = int(os.getenv("RATE_LIMIT_MAX", "60"))  # per window per IP for public/GraphQL
 _rate_bucket: dict[str, dict] = {}
 logger = logging.getLogger("security")
 
 graph = Graph(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
-embed_model = SentenceTransformer('all-MiniLM-L6-v2')
-faiss = FaissIndex(index_path='faiss.index')
+embed_model = SentenceTransformer("all-MiniLM-L6-v2")
+faiss = FaissIndex(index_path="faiss.index")
 
 SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "schema.graphql")
 with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
@@ -90,23 +94,25 @@ with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
 # Original query resolvers
 query = QueryType()
 
+
 @query.field("claim")
 def resolve_claim(_, info, id):
     q = "MATCH (c:Claim {id:$id})<-[:REPORTS]-(s:Source) RETURN c, s LIMIT 1"
     res = graph.run(q, id=id).data()
     if not res:
         raise HTTPException(status_code=404, detail="Claim not found")
-    c = res[0]['c']
-    s = res[0]['s']
+    c = res[0]["c"]
+    s = res[0]["s"]
     return {
-        "id": c['id'],
-        "text": c.get('text'),
-        "veracity": float(c.get('veracity', 0.5)),
-        "state": c.get('state'),
-        "timestamp": str(c.get('timestamp')) if c.get('timestamp') else None,
-        "source": s.get('name'),
-        "provenance": c.get('provenance')
+        "id": c["id"],
+        "text": c.get("text"),
+        "veracity": float(c.get("veracity", 0.5)),
+        "state": c.get("state"),
+        "timestamp": str(c.get("timestamp")) if c.get("timestamp") else None,
+        "source": s.get("name"),
+        "provenance": c.get("provenance"),
     }
+
 
 @query.field("search")
 def resolve_search(_, info, query, topK=5):
@@ -116,20 +122,22 @@ def resolve_search(_, info, query, topK=5):
     for r in results:
         # fetch claim metadata from Neo4j
         q = "MATCH (c:Claim {id:$id})<-[:REPORTS]-(s:Source) RETURN c, s LIMIT 1"
-        res = graph.run(q, id=r['id']).data()
+        res = graph.run(q, id=r["id"]).data()
         if not res:
             continue
-        c = res[0]['c']
-        s = res[0]['s']
-        claims.append({
-            "id": c['id'],
-            "text": c.get('text'),
-            "veracity": float(c.get('veracity', 0.5)),
-            "state": c.get('state'),
-            "timestamp": str(c.get('timestamp')) if c.get('timestamp') else None,
-            "source": s.get('name'),
-            "provenance": c.get('provenance')
-        })
+        c = res[0]["c"]
+        s = res[0]["s"]
+        claims.append(
+            {
+                "id": c["id"],
+                "text": c.get("text"),
+                "veracity": float(c.get("veracity", 0.5)),
+                "state": c.get("state"),
+                "timestamp": str(c.get("timestamp")) if c.get("timestamp") else None,
+                "source": s.get("name"),
+                "provenance": c.get("provenance"),
+            }
+        )
     return claims
 
 
@@ -146,21 +154,23 @@ def resolve_apps(_, info):
     results = graph.run(q).data()
     apps = []
     for record in results:
-        app_node = record['a']
+        app_node = record["a"]
         if not app_node:
             continue
-        apps.append({
-            "id": app_node.get('id'),
-            "name": app_node.get('name', 'Unknown'),
-            "whistlerScore": float(app_node.get('whistlerScore', 0)),
-            "metadata": {
-                "zkProofVerified": app_node.get('zkProofVerified', False),
-                "category": app_node.get('category'),
-                "description": app_node.get('description'),
-            },
-            "claims": [dict(c) for c in record.get('claims', []) if c],
-            "reviews": [dict(r) for r in record.get('reviews', []) if r],
-        })
+        apps.append(
+            {
+                "id": app_node.get("id"),
+                "name": app_node.get("name", "Unknown"),
+                "whistlerScore": float(app_node.get("whistlerScore", 0)),
+                "metadata": {
+                    "zkProofVerified": app_node.get("zkProofVerified", False),
+                    "category": app_node.get("category"),
+                    "description": app_node.get("description"),
+                },
+                "claims": [dict(c) for c in record.get("claims", []) if c],
+                "reviews": [dict(r) for r in record.get("reviews", []) if r],
+            }
+        )
     return apps
 
 
@@ -178,49 +188,54 @@ def resolve_app(_, info, id):
            collect(DISTINCT r) as reviews
     """
     results = graph.run(q, id=id).data()
-    if not results or not results[0].get('a'):
+    if not results or not results[0].get("a"):
         return None
-    
+
     record = results[0]
-    app_node = record['a']
-    
+    app_node = record["a"]
+
     claims = []
-    for claim_data in record.get('claims', []):
-        c = claim_data.get('claim')
+    for claim_data in record.get("claims", []):
+        c = claim_data.get("claim")
         if not c:
             continue
-        verdicts = claim_data.get('verdicts', [])
-        claims.append({
-            "id": c.get('id'),
-            "statement": c.get('text') or c.get('statement'),
-            "claimHash": c.get('hash') or c.get('claimHash', ''),
-            "verdicts": [
-                {
-                    "outcome": v.get('outcome', 'UNKNOWN'),
-                    "confidence": float(v.get('confidence', 0.5))
-                }
-                for v in verdicts if v
-            ]
-        })
-    
+        verdicts = claim_data.get("verdicts", [])
+        claims.append(
+            {
+                "id": c.get("id"),
+                "statement": c.get("text") or c.get("statement"),
+                "claimHash": c.get("hash") or c.get("claimHash", ""),
+                "verdicts": [
+                    {
+                        "outcome": v.get("outcome", "UNKNOWN"),
+                        "confidence": float(v.get("confidence", 0.5)),
+                    }
+                    for v in verdicts
+                    if v
+                ],
+            }
+        )
+
     reviews = []
-    for r in record.get('reviews', []):
+    for r in record.get("reviews", []):
         if r:
-            reviews.append({
-                "id": r.get('id'),
-                "rating": float(r.get('rating', 0)),
-                "sentiment": r.get('sentiment', 'NEUTRAL'),
-                "text": r.get('text'),
-            })
-    
+            reviews.append(
+                {
+                    "id": r.get("id"),
+                    "rating": float(r.get("rating", 0)),
+                    "sentiment": r.get("sentiment", "NEUTRAL"),
+                    "text": r.get("text"),
+                }
+            )
+
     return {
-        "id": app_node.get('id'),
-        "name": app_node.get('name', 'Unknown'),
-        "whistlerScore": float(app_node.get('whistlerScore', 0)),
+        "id": app_node.get("id"),
+        "name": app_node.get("name", "Unknown"),
+        "whistlerScore": float(app_node.get("whistlerScore", 0)),
         "metadata": {
-            "zkProofVerified": app_node.get('zkProofVerified', False),
-            "category": app_node.get('category'),
-            "description": app_node.get('description'),
+            "zkProofVerified": app_node.get("zkProofVerified", False),
+            "category": app_node.get("category"),
+            "description": app_node.get("description"),
         },
         "claims": claims,
         "reviews": reviews,
@@ -236,32 +251,35 @@ def resolve_score_app(_, info, appId):
     RETURN a, s
     """
     results = graph.run(q, id=appId).data()
-    if not results or not results[0].get('a'):
+    if not results or not results[0].get("a"):
         return None
-    
-    app_node = results[0]['a']
-    score_node = results[0].get('s')
-    
+
+    app_node = results[0]["a"]
+    score_node = results[0].get("s")
+
     # Calculate grade from whistlerScore
-    score = float(app_node.get('whistlerScore', 0))
+    score = float(app_node.get("whistlerScore", 0))
     if score >= 90:
-        grade = 'A'
+        grade = "A"
     elif score >= 80:
-        grade = 'B'
+        grade = "B"
     elif score >= 70:
-        grade = 'C'
+        grade = "C"
     elif score >= 60:
-        grade = 'D'
+        grade = "D"
     else:
-        grade = 'F'
-    
+        grade = "F"
+
     # Get breakdown from score node or calculate defaults
     if score_node:
         breakdown = {
-            "privacy": {"value": float(score_node.get('privacy', 50)), "label": "Privacy"},
-            "financial": {"value": float(score_node.get('financial', 50)), "label": "Financial"},
-            "security": {"value": float(score_node.get('security', 50)), "label": "Security"},
-            "transparency": {"value": float(score_node.get('transparency', 50)), "label": "Transparency"},
+            "privacy": {"value": float(score_node.get("privacy", 50)), "label": "Privacy"},
+            "financial": {"value": float(score_node.get("financial", 50)), "label": "Financial"},
+            "security": {"value": float(score_node.get("security", 50)), "label": "Security"},
+            "transparency": {
+                "value": float(score_node.get("transparency", 50)),
+                "label": "Transparency",
+            },
         }
     else:
         # Default breakdown based on overall score
@@ -271,7 +289,7 @@ def resolve_score_app(_, info, appId):
             "security": {"value": score * 0.95, "label": "Security"},
             "transparency": {"value": score * 0.8, "label": "Transparency"},
         }
-    
+
     return {
         "grade": grade,
         "breakdown": breakdown,
@@ -296,7 +314,7 @@ schema = make_executable_schema(type_defs, query, mutation)
 app = FastAPI(
     title="Truth Engine - Personal Proof Vault",
     description="Blockchain-verified identity and credential verification system",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 if STRICT_CORS and (not ALLOWED_ORIGINS or ALLOWED_ORIGINS == [_DEFAULT_ORIGIN]):
@@ -310,6 +328,7 @@ if ENABLE_CORS:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
 
 # Security headers middleware (best-effort, configurable)
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -332,8 +351,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("Content-Security-Policy", csp)
         # HSTS only makes sense behind HTTPS/termination; keep configurable
         if request.url.scheme == "https":
-            response.headers.setdefault("Strict-Transport-Security", f"max-age={HSTS_MAX_AGE}; includeSubDomains")
+            response.headers.setdefault(
+                "Strict-Transport-Security", f"max-age={HSTS_MAX_AGE}; includeSubDomains"
+            )
         return response
+
 
 if ENABLE_SECURITY_HEADERS:
     app.add_middleware(SecurityHeadersMiddleware)
@@ -432,6 +454,7 @@ if WS_ROUTER_AVAILABLE and ws_router:
 # Mount AAIP Swarm routes
 try:
     from api.swarm_routes import router as swarm_router
+
     app.include_router(swarm_router)
 except ImportError:
     pass  # Swarm router optional
@@ -439,6 +462,7 @@ except ImportError:
 # Mount Cross-Chain Anomaly Federation routes
 try:
     from api.cross_chain_routes import router as cross_chain_router
+
     app.include_router(cross_chain_router)
 except ImportError:
     pass  # Cross-chain router optional
@@ -446,12 +470,14 @@ except ImportError:
 # Mount Quantum Computing routes
 try:
     from api.quantum_routes import router as quantum_router
+
     app.include_router(quantum_router)
 except ImportError:
     pass  # Quantum router optional
 
 # Prometheus metrics endpoint
 if PROMETHEUS_AVAILABLE:
+
     @app.get("/metrics")
     async def prometheus_metrics():
         """Prometheus metrics endpoint."""
@@ -465,6 +491,7 @@ async def startup_event():
     if not vkeys_ready():
         raise RuntimeError("Verification keys are not loaded; startup gating failed.")
 
+
 # Root endpoint
 @app.get("/")
 async def root():
@@ -472,7 +499,7 @@ async def root():
         "message": "Truth Engine - Personal Proof Vault API",
         "graphql": "/graphql",
         "vault": "/vault",
-        "metrics": "/metrics" if PROMETHEUS_AVAILABLE else None
+        "metrics": "/metrics" if PROMETHEUS_AVAILABLE else None,
     }
 
 
@@ -509,6 +536,7 @@ async def health_ready():
 @app.get("/capabilities")
 async def capabilities():
     from api.utils import HMAC_SECRET
+
     return {
         "service": "Truth Engine - Personal Proof Vault",
         "version": "1.0.0",

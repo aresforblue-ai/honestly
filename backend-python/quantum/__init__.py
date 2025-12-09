@@ -25,4 +25,3 @@ __all__ = [
     "get_quantum_gateway",
     "QuantumZKMLProver",
 ]
-

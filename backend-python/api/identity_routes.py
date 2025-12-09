@@ -15,11 +15,12 @@ Features:
 import os
 import secrets
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, status, Body
+from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel, Field
 
 # Import identity modules
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from identity.ai_agent_protocol import (
@@ -27,8 +28,6 @@ from identity.ai_agent_protocol import (
     register_ai_agent,
     verify_agent_capability,
     get_agent_reputation,
-    AgentCapability,
-    AgentConstraint,
 )
 from identity.verifiable_credentials import (
     CredentialIssuer,
@@ -40,7 +39,6 @@ from identity.verifiable_credentials import (
 from identity.social_recovery import (
     SocialRecoveryManager,
     create_recovery_setup,
-    GuardianType,
 )
 from identity.cross_chain_bridge import (
     get_bridge,
@@ -55,12 +53,14 @@ router = APIRouter(prefix="/identity", tags=["identity"])
 # PYDANTIC MODELS
 # ============================================
 
+
 class RegisterAgentRequest(BaseModel):
     """Request to register an AI agent.
-    
+
     CRITICAL: Agent identity = Model + Prompt + Configuration.
     The system_prompt is required to create a unique, verifiable identity.
     """
+
     name: str = Field(..., description="Agent name (e.g., claude-3-opus)")
     operator_id: str = Field(..., description="Operator identifier")
     operator_name: str = Field(..., description="Operator name (organization)")
@@ -69,7 +69,9 @@ class RegisterAgentRequest(BaseModel):
     constraints: List[str] = Field(default=[], description="Agent constraints")
     public_key: str = Field(..., description="Agent's public key (PEM format)")
     is_human_backed: bool = Field(default=True, description="Has human oversight")
-    system_prompt: Optional[str] = Field(None, description="System prompt/instructions (CRITICAL for identity)")
+    system_prompt: Optional[str] = Field(
+        None, description="System prompt/instructions (CRITICAL for identity)"
+    )
     model_version: Optional[str] = Field("1.0.0", description="Model version")
     weights_hash: Optional[str] = Field(None, description="Hash of model weights (optional)")
     config_hash: Optional[str] = Field(None, description="Hash of model configuration (optional)")
@@ -77,12 +79,14 @@ class RegisterAgentRequest(BaseModel):
 
 class VerifyCapabilityRequest(BaseModel):
     """Request to verify agent capability."""
+
     agent_id: str
     capability: str
 
 
 class IssueCredentialRequest(BaseModel):
     """Request to issue a credential."""
+
     subject_did: str = Field(..., description="Subject DID")
     credential_type: str = Field(..., description="Type of credential")
     claims: Dict[str, Any] = Field(..., description="Credential claims")
@@ -92,6 +96,7 @@ class IssueCredentialRequest(BaseModel):
 
 class SetupRecoveryRequest(BaseModel):
     """Request to setup social recovery."""
+
     user_id: str
     guardians: List[Dict[str, Any]] = Field(..., description="Guardian configurations")
     threshold: Optional[int] = Field(None, description="Recovery threshold")
@@ -99,6 +104,7 @@ class SetupRecoveryRequest(BaseModel):
 
 class BridgeIdentityRequest(BaseModel):
     """Request to bridge identity to a new chain."""
+
     universal_did: str
     target_chain: str
     target_address: str
@@ -106,6 +112,7 @@ class BridgeIdentityRequest(BaseModel):
 
 class CreateUniversalIdentityRequest(BaseModel):
     """Request to create a universal identity."""
+
     primary_chain: str = Field(default="ethereum")
     primary_address: str
     metadata: Optional[Dict] = None
@@ -113,6 +120,7 @@ class CreateUniversalIdentityRequest(BaseModel):
 
 class ProofOfHumanityRequest(BaseModel):
     """Request proof of humanity."""
+
     subject_did: str
     verification_method: str = Field(default="liveness_check")
     liveness_score: float = Field(default=0.95, ge=0, le=1)
@@ -122,11 +130,12 @@ class ProofOfHumanityRequest(BaseModel):
 # AI AGENT IDENTITY ENDPOINTS
 # ============================================
 
+
 @router.post("/agent/register")
 async def api_register_agent(request: RegisterAgentRequest):
     """
     Register a new AI agent identity.
-    
+
     This creates a verifiable identity for an AI agent, allowing it to:
     - Prove its capabilities
     - Accumulate reputation
@@ -156,7 +165,7 @@ async def api_register_agent(request: RegisterAgentRequest):
 async def api_verify_capability(request: VerifyCapabilityRequest):
     """
     Verify an agent has a specific capability.
-    
+
     Returns a proof commitment that can be verified on-chain.
     """
     result = verify_agent_capability(request.agent_id, request.capability)
@@ -168,10 +177,10 @@ async def api_get_agent(agent_id: str):
     """Get agent identity details."""
     registry = get_registry()
     agent = registry.get_agent(agent_id)
-    
+
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    
+
     return {
         "success": True,
         "agent": agent.to_dict(),
@@ -186,7 +195,7 @@ async def api_get_agent_reputation(
 ):
     """
     Get agent reputation, optionally with threshold proof.
-    
+
     If threshold is provided, returns a ZK proof that
     reputation meets the threshold without revealing exact score.
     """
@@ -202,10 +211,10 @@ async def api_record_interaction(
     """Record an interaction outcome for reputation update."""
     registry = get_registry()
     result = registry.update_reputation(agent_id, positive, weight)
-    
+
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
-    
+
     return {"success": True, "reputation": result}
 
 
@@ -215,6 +224,7 @@ async def api_record_interaction(
 
 # Global credential issuer
 _issuer = None
+
 
 def get_issuer() -> CredentialIssuer:
     global _issuer
@@ -230,18 +240,18 @@ def get_issuer() -> CredentialIssuer:
 async def api_issue_credential(request: IssueCredentialRequest):
     """
     Issue a verifiable credential.
-    
+
     Supports W3C Verifiable Credentials format with
     optional ZK selective disclosure.
     """
     issuer = get_issuer()
-    
+
     try:
         credential_type = CredentialType(request.credential_type)
     except ValueError:
         # Default to generic credential
         credential_type = CredentialType.VERIFIABLE_CREDENTIAL
-    
+
     credential = issuer.issue_credential(
         subject_did=request.subject_did,
         credential_type=credential_type,
@@ -249,7 +259,7 @@ async def api_issue_credential(request: IssueCredentialRequest):
         expires_days=request.expires_days,
         enable_selective_disclosure=request.selective_disclosure,
     )
-    
+
     return {
         "success": True,
         "credential": credential.to_dict(),
@@ -261,28 +271,32 @@ async def api_issue_credential(request: IssueCredentialRequest):
 async def api_verify_credential(credential: Dict = Body(...)):
     """
     Verify a credential's authenticity.
-    
+
     Checks structure, signature, expiration, and revocation status.
     """
     from identity.verifiable_credentials import VerifiableCredential, CredentialSubject, Proof
-    
+
     verifier = CredentialVerifier()
-    
+
     # Reconstruct credential object
     try:
         subject = CredentialSubject(
             id=credential["credentialSubject"]["id"],
             claims={k: v for k, v in credential["credentialSubject"].items() if k != "id"},
         )
-        
+
         proof_data = credential.get("proof", {})
-        proof = Proof(
-            type=proof_data.get("type", ""),
-            created=proof_data.get("created", ""),
-            verification_method=proof_data.get("verificationMethod", ""),
-            proof_value=proof_data.get("proofValue", ""),
-        ) if proof_data else None
-        
+        proof = (
+            Proof(
+                type=proof_data.get("type", ""),
+                created=proof_data.get("created", ""),
+                verification_method=proof_data.get("verificationMethod", ""),
+                proof_value=proof_data.get("proofValue", ""),
+            )
+            if proof_data
+            else None
+        )
+
         vc = VerifiableCredential(
             id=credential["id"],
             type=credential["type"],
@@ -292,10 +306,10 @@ async def api_verify_credential(credential: Dict = Body(...)):
             credential_subject=subject,
             proof=proof,
         )
-        
+
         result = verifier.verify_credential(vc)
         return result
-        
+
     except Exception as e:
         return {"valid": False, "error": str(e)}
 
@@ -304,19 +318,19 @@ async def api_verify_credential(credential: Dict = Body(...)):
 async def api_proof_of_humanity(request: ProofOfHumanityRequest):
     """
     Issue a Proof of Humanity credential.
-    
+
     This credential proves the subject is human without
     revealing their identity - critical for the AI age.
     """
     issuer = get_issuer()
-    
+
     credential = create_proof_of_humanity_credential(
         issuer=issuer,
         subject_did=request.subject_did,
         verification_method=request.verification_method,
         liveness_score=request.liveness_score,
     )
-    
+
     return {
         "success": True,
         "credential": credential.to_dict(),
@@ -332,17 +346,17 @@ async def api_selective_disclosure(
 ):
     """
     Create a selective disclosure presentation.
-    
+
     Reveals only specified claims, with ZK proof of others existing.
     """
     from identity.verifiable_credentials import VerifiableCredential, CredentialSubject
-    
+
     try:
         subject = CredentialSubject(
             id=credential["credentialSubject"]["id"],
             claims={k: v for k, v in credential["credentialSubject"].items() if k != "id"},
         )
-        
+
         vc = VerifiableCredential(
             id=credential["id"],
             type=credential["type"],
@@ -351,18 +365,18 @@ async def api_selective_disclosure(
             credential_subject=subject,
             selective_disclosure_enabled=True,
         )
-        
+
         presentation = SelectiveDisclosure.create_disclosed_presentation(
             credential=vc,
             claims_to_disclose=claims_to_disclose,
             holder_did=holder_did,
         )
-        
+
         return {
             "success": True,
             "presentation": presentation.to_dict(),
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -372,6 +386,7 @@ async def api_selective_disclosure(
 # ============================================
 
 _recovery_manager = None
+
 
 def get_recovery_manager() -> SocialRecoveryManager:
     global _recovery_manager
@@ -384,13 +399,13 @@ def get_recovery_manager() -> SocialRecoveryManager:
 async def api_setup_recovery(request: SetupRecoveryRequest):
     """
     Set up social recovery for an identity.
-    
+
     Uses Shamir's Secret Sharing to split the master key
     among trusted guardians.
     """
     # Generate a master key for demo (in production, user provides their key)
     master_key = secrets.token_bytes(32)
-    
+
     try:
         config, shares = create_recovery_setup(
             user_id=request.user_id,
@@ -398,7 +413,7 @@ async def api_setup_recovery(request: SetupRecoveryRequest):
             guardians=request.guardians,
             threshold=request.threshold,
         )
-        
+
         return {
             "success": True,
             "config": {
@@ -418,11 +433,11 @@ async def api_setup_recovery(request: SetupRecoveryRequest):
 async def api_initiate_recovery(user_id: str):
     """
     Initiate the recovery process.
-    
+
     This starts collecting shares from guardians.
     """
     manager = get_recovery_manager()
-    
+
     try:
         process = manager.initiate_recovery(user_id)
         return {
@@ -447,11 +462,11 @@ async def api_submit_share(
     Submit a recovery share from a guardian.
     """
     manager = get_recovery_manager()
-    
+
     try:
         # Convert hex share value to int
         share_int = int(share_value, 16) if share_value.startswith("0x") else int(share_value, 16)
-        
+
         result = manager.submit_share(
             recovery_id=recovery_id,
             guardian_id=guardian_id,
@@ -474,30 +489,31 @@ async def api_recovery_status(recovery_id: str):
 # CROSS-CHAIN BRIDGE ENDPOINTS
 # ============================================
 
+
 @router.post("/bridge/create")
 async def api_create_universal_identity(request: CreateUniversalIdentityRequest):
     """
     Create a universal cross-chain identity.
-    
+
     This identity can be bridged to any supported blockchain.
     """
     bridge = get_bridge()
-    
+
     try:
         chain = Chain(request.primary_chain)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Unsupported chain: {request.primary_chain}")
-    
+
     # Generate identity secret
     identity_secret = secrets.token_hex(32)
-    
+
     identity = bridge.create_universal_identity(
         identity_secret=identity_secret,
         primary_chain=chain,
         primary_address=request.primary_address,
         metadata=request.metadata,
     )
-    
+
     return {
         "success": True,
         "identity": identity.to_dict(),
@@ -510,24 +526,24 @@ async def api_create_universal_identity(request: CreateUniversalIdentityRequest)
 async def api_bridge_identity(request: BridgeIdentityRequest):
     """
     Bridge an identity to a new blockchain.
-    
+
     This creates a verifiable presence on the target chain
     linked to the universal identity.
     """
     bridge = get_bridge()
-    
+
     try:
         target_chain = Chain(request.target_chain)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Unsupported chain: {request.target_chain}")
-    
+
     try:
         chain_identity, proof = bridge.bridge_identity(
             universal_did=request.universal_did,
             target_chain=target_chain,
             target_address=request.target_address,
         )
-        
+
         return {
             "success": True,
             "chain_identity": chain_identity.to_dict(),
@@ -543,10 +559,10 @@ async def api_get_universal_identity(universal_did: str):
     """Get a universal identity's details."""
     bridge = get_bridge()
     identity = bridge.get_identity(universal_did)
-    
+
     if not identity:
         raise HTTPException(status_code=404, detail="Identity not found")
-    
+
     return {"success": True, "identity": identity}
 
 
@@ -557,12 +573,12 @@ async def api_verify_on_chain(
 ):
     """Verify an identity on a specific chain."""
     bridge = get_bridge()
-    
+
     try:
         target_chain = Chain(chain)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Unsupported chain: {chain}")
-    
+
     result = bridge.verify_cross_chain_identity(universal_did, target_chain)
     return result
 
@@ -585,11 +601,12 @@ async def api_list_chains():
 # DID RESOLVER ENDPOINTS
 # ============================================
 
+
 @router.get("/did/resolve/{did:path}")
 async def api_resolve_did(did: str):
     """
     Resolve a DID to its document.
-    
+
     Supports:
     - did:honestly:universal:<id>
     - did:honestly:ethereum:<address>
@@ -598,10 +615,10 @@ async def api_resolve_did(did: str):
     """
     resolver = get_resolver()
     document = resolver.resolve(did)
-    
+
     if not document:
         raise HTTPException(status_code=404, detail="DID not found")
-    
+
     return {"didDocument": document}
 
 
@@ -609,12 +626,13 @@ async def api_resolve_did(did: str):
 # STATISTICS & INFO
 # ============================================
 
+
 @router.get("/stats")
 async def api_identity_stats():
     """Get identity system statistics."""
     bridge = get_bridge()
     registry = get_registry()
-    
+
     return {
         "ai_agents_registered": len(registry.storage),
         "universal_identities": len(bridge.identities),
@@ -628,4 +646,3 @@ async def api_identity_stats():
             "selective_disclosure": True,
         },
     }
-

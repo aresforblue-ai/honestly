@@ -1,2 +1,1 @@
 """Personal Proof Vault package."""
-

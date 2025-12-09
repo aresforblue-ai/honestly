@@ -3,6 +3,7 @@ Custom exceptions and error handling for the Truth Engine API.
 
 Provides structured error responses with correlation IDs for debugging.
 """
+
 import uuid
 import logging
 from typing import Any, Dict, Optional
@@ -26,7 +27,7 @@ logger = logging.getLogger("api.errors")
 
 class APIError(Exception):
     """Base API exception with structured error details."""
-    
+
     def __init__(
         self,
         message: str,
@@ -60,9 +61,10 @@ class APIError(Exception):
 # Authentication Errors
 # ============================================
 
+
 class AuthenticationError(APIError):
     """Authentication failed."""
-    
+
     def __init__(self, message: str = "Authentication required", details: Optional[Dict] = None):
         super().__init__(
             message=message,
@@ -74,7 +76,7 @@ class AuthenticationError(APIError):
 
 class InvalidTokenError(APIError):
     """JWT or API token is invalid."""
-    
+
     def __init__(self, message: str = "Invalid or expired token", details: Optional[Dict] = None):
         super().__init__(
             message=message,
@@ -86,7 +88,7 @@ class InvalidTokenError(APIError):
 
 class InsufficientPermissionsError(APIError):
     """User lacks required permissions."""
-    
+
     def __init__(self, message: str = "Insufficient permissions", required: Optional[str] = None):
         details = {"required_permission": required} if required else None
         super().__init__(
@@ -101,9 +103,10 @@ class InsufficientPermissionsError(APIError):
 # Resource Errors
 # ============================================
 
+
 class ResourceNotFoundError(APIError):
     """Requested resource does not exist."""
-    
+
     def __init__(self, resource_type: str, resource_id: str):
         super().__init__(
             message=f"{resource_type} not found",
@@ -115,7 +118,7 @@ class ResourceNotFoundError(APIError):
 
 class ResourceConflictError(APIError):
     """Resource already exists or conflicts with existing state."""
-    
+
     def __init__(self, message: str, resource_type: str, resource_id: str):
         super().__init__(
             message=message,
@@ -129,9 +132,10 @@ class ResourceConflictError(APIError):
 # Validation Errors
 # ============================================
 
+
 class ValidationError(APIError):
     """Request validation failed."""
-    
+
     def __init__(self, message: str, field: Optional[str] = None, details: Optional[Dict] = None):
         error_details = details or {}
         if field:
@@ -146,7 +150,7 @@ class ValidationError(APIError):
 
 class InvalidInputError(APIError):
     """Invalid input provided."""
-    
+
     def __init__(self, message: str, field: Optional[str] = None):
         super().__init__(
             message=message,
@@ -160,9 +164,10 @@ class InvalidInputError(APIError):
 # Rate Limiting Errors
 # ============================================
 
+
 class RateLimitExceededError(APIError):
     """Request rate limit exceeded."""
-    
+
     def __init__(self, retry_after: int = 60):
         super().__init__(
             message="Rate limit exceeded. Please try again later.",
@@ -176,9 +181,10 @@ class RateLimitExceededError(APIError):
 # ZK Proof Errors
 # ============================================
 
+
 class ProofGenerationError(APIError):
     """Failed to generate ZK proof."""
-    
+
     def __init__(self, circuit: str, reason: str):
         super().__init__(
             message=f"Failed to generate proof for circuit: {circuit}",
@@ -190,7 +196,7 @@ class ProofGenerationError(APIError):
 
 class ProofVerificationError(APIError):
     """ZK proof verification failed."""
-    
+
     def __init__(self, circuit: str, reason: str = "Invalid proof"):
         super().__init__(
             message=f"Proof verification failed for circuit: {circuit}",
@@ -202,7 +208,7 @@ class ProofVerificationError(APIError):
 
 class VerificationKeyUnavailableError(APIError):
     """Verification key is not available."""
-    
+
     def __init__(self, circuit: str):
         super().__init__(
             message=f"Verification key unavailable for circuit: {circuit}",
@@ -216,9 +222,10 @@ class VerificationKeyUnavailableError(APIError):
 # External Service Errors
 # ============================================
 
+
 class DatabaseConnectionError(APIError):
     """Database connection failed."""
-    
+
     def __init__(self, database: str = "neo4j"):
         super().__init__(
             message=f"Database connection failed: {database}",
@@ -230,7 +237,7 @@ class DatabaseConnectionError(APIError):
 
 class BlockchainError(APIError):
     """Blockchain operation failed."""
-    
+
     def __init__(self, operation: str, reason: str):
         super().__init__(
             message=f"Blockchain operation failed: {operation}",
@@ -242,7 +249,7 @@ class BlockchainError(APIError):
 
 class ExternalServiceError(APIError):
     """External service call failed."""
-    
+
     def __init__(self, service: str, reason: str):
         super().__init__(
             message=f"External service error: {service}",
@@ -256,6 +263,7 @@ class ExternalServiceError(APIError):
 # Error Handlers
 # ============================================
 
+
 async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
     """Handle custom API errors with structured responses."""
     logger.error(
@@ -267,7 +275,7 @@ async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
             "path": request.url.path,
             "method": request.method,
             "client": request.client.host if request.client else None,
-        }
+        },
     )
     return JSONResponse(
         status_code=exc.status_code,
@@ -286,7 +294,7 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
             "detail": exc.detail,
             "correlation_id": correlation_id,
             "path": request.url.path,
-        }
+        },
     )
     return JSONResponse(
         status_code=exc.status_code,
@@ -310,7 +318,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
             "correlation_id": correlation_id,
             "path": request.url.path,
             "method": request.method,
-        }
+        },
     )
     return JSONResponse(
         status_code=HTTP_500_INTERNAL_SERVER_ERROR,
@@ -330,5 +338,3 @@ def register_error_handlers(app):
     app.add_exception_handler(APIError, api_error_handler)
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
-
-

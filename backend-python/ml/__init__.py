@@ -55,4 +55,3 @@ __all__ = [
     "Neo4jDataLoader",
     "create_training_dataset",
 ]
-

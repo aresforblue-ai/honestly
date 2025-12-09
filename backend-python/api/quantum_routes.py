@@ -5,14 +5,12 @@ Quantum Computing API Routes
 REST endpoints for VERIDICUS-powered quantum computing access.
 """
 
-import os
 import logging
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel, Field
 
 from quantum.quantum_gateway import (
-    VERIDICUSQuantumGateway,
     QuantumJobRequest,
     QuantumProvider,
     get_quantum_gateway,
@@ -26,7 +24,10 @@ router = APIRouter(prefix="/quantum", tags=["quantum"])
 # Request/Response Models
 class QuantumJobRequestModel(BaseModel):
     """Request for quantum computation."""
-    job_type: str = Field(..., description="Type of job: zkml_proof, circuit_optimize, anomaly_detect, security_audit")
+
+    job_type: str = Field(
+        ..., description="Type of job: zkml_proof, circuit_optimize, anomaly_detect, security_audit"
+    )
     circuit_data: Dict[str, Any] = Field(..., description="Quantum circuit or job specification")
     provider: Optional[str] = Field(None, description="Quantum provider: ibm, google, ionq, auto")
     VERIDICUS_payment: int = Field(..., description="VERIDICUS tokens to pay")
@@ -37,6 +38,7 @@ class QuantumJobRequestModel(BaseModel):
 
 class QuantumJobResponse(BaseModel):
     """Response from quantum computation."""
+
     job_id: str
     result: Dict[str, Any]
     provider_used: str
@@ -51,7 +53,7 @@ class QuantumJobResponse(BaseModel):
 async def execute_quantum_job(request: QuantumJobRequestModel):
     """
     Execute a quantum computing job via VERIDICUS payment.
-    
+
     Job types:
     - zkml_proof: Accelerate zkML proof generation (10 VERIDICUS)
     - circuit_optimize: Optimize Circom circuit (5 VERIDICUS)
@@ -60,7 +62,7 @@ async def execute_quantum_job(request: QuantumJobRequestModel):
     """
     try:
         gateway = get_quantum_gateway()
-        
+
         # Convert provider string to enum
         provider = None
         if request.provider:
@@ -68,7 +70,7 @@ async def execute_quantum_job(request: QuantumJobRequestModel):
                 provider = QuantumProvider[request.provider.upper()]
             except KeyError:
                 raise HTTPException(status_code=400, detail=f"Invalid provider: {request.provider}")
-        
+
         # Create job request
         job_request = QuantumJobRequest(
             job_type=request.job_type,
@@ -79,10 +81,10 @@ async def execute_quantum_job(request: QuantumJobRequestModel):
             priority=request.priority,
             user_address=request.user_address,
         )
-        
+
         # Execute job
         result = await gateway.execute_quantum_job(job_request)
-        
+
         return QuantumJobResponse(
             job_id=result.job_id,
             result=result.result,
@@ -108,13 +110,13 @@ async def accelerate_zkml_proof(
 ):
     """
     Generate zkML proof with quantum acceleration.
-    
+
     Uses quantum computing to accelerate Groth16 proof generation.
     Costs 10 VERIDICUS tokens.
     """
     try:
         from quantum.zkml_quantum_acceleration import QuantumZKMLProver
-        
+
         prover = QuantumZKMLProver()
         proof = await prover.prove_anomaly_threshold_quantum(
             agent_features=agent_features,
@@ -124,7 +126,7 @@ async def accelerate_zkml_proof(
             priority=priority,
             user_address=user_address,
         )
-        
+
         return proof
     except Exception as e:
         logger.error(f"Error in quantum zkML acceleration: {e}")
@@ -137,37 +139,40 @@ async def list_providers():
     List available quantum computing providers.
     """
     providers = []
-    
+
     # Check which providers are available
     gateway = get_quantum_gateway()
-    
+
     if gateway.ibm_provider:
-        providers.append({
-            "name": "IBM Quantum",
-            "id": "ibm_quantum",
-            "available": True,
-            "description": "IBM Quantum Network access"
-        })
-    
+        providers.append(
+            {
+                "name": "IBM Quantum",
+                "id": "ibm_quantum",
+                "available": True,
+                "description": "IBM Quantum Network access",
+            }
+        )
+
     if gateway.google_available:
-        providers.append({
-            "name": "Google Quantum AI",
-            "id": "google_quantum_ai",
+        providers.append(
+            {
+                "name": "Google Quantum AI",
+                "id": "google_quantum_ai",
+                "available": True,
+                "description": "Google Sycamore processor access",
+            }
+        )
+
+    providers.append(
+        {
+            "name": "Simulator",
+            "id": "simulator",
             "available": True,
-            "description": "Google Sycamore processor access"
-        })
-    
-    providers.append({
-        "name": "Simulator",
-        "id": "simulator",
-        "available": True,
-        "description": "Quantum simulator (for testing)"
-    })
-    
-    return {
-        "providers": providers,
-        "default": "simulator"
-    }
+            "description": "Quantum simulator (for testing)",
+        }
+    )
+
+    return {"providers": providers, "default": "simulator"}
 
 
 @router.get("/pricing")
@@ -198,4 +203,3 @@ async def get_pricing():
         },
         "VERIDICUS_to_usd_rate": 0.10,  # Example rate
     }
-
