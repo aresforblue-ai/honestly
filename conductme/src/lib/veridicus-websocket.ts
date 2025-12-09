@@ -23,7 +23,7 @@ export type EventCallback = (event: VeridicusEvent) => void;
 
 export class VeridicusWebSocket {
   private ws: WebSocket | null = null;
-  private callbacks: Map<VeridicusEventType, Set<EventCallback>> = new Map();
+  private callbacks: Map<VeridicusEventType | 'all', Set<EventCallback>> = new Map();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private reconnectDelay = 5000;
@@ -51,7 +51,7 @@ export class VeridicusWebSocket {
             return; // Ignore pong messages
           }
 
-          const veridicusEvent: VeritasEvent = {
+          const veridicusEvent: VeridicusEvent = {
             type: data.type,
             timestamp: data.timestamp || Date.now(),
             data: data.data || data,
@@ -119,7 +119,7 @@ export class VeridicusWebSocket {
     }
 
     // Also emit to 'all' listeners
-    const allCallbacks = this.callbacks.get('all' as VeridicusEventType);
+    const allCallbacks = this.callbacks.get('all');
     if (allCallbacks) {
       allCallbacks.forEach((callback) => {
         try {
@@ -189,14 +189,14 @@ export class VeridicusWebSocket {
 }
 
 // Singleton instance
-let wsInstance: VeritasWebSocket | null = null;
+let wsInstance: VeridicusWebSocket | null = null;
 
 /**
  * Get or create WebSocket instance
  */
-export function getVeritasWebSocket(): VeritasWebSocket {
+export function getVeridicusWebSocket(): VeridicusWebSocket {
   if (!wsInstance) {
-    wsInstance = new VeritasWebSocket();
+    wsInstance = new VeridicusWebSocket();
   }
   return wsInstance;
 }
@@ -204,17 +204,19 @@ export function getVeritasWebSocket(): VeritasWebSocket {
 /**
  * React hook for VERIDICUS WebSocket events
  */
-export function useVeritasWebSocket(
-  eventType: VeritasEventType | 'all',
+import { useEffect } from 'react';
+
+export function useVERIDICUSWebSocket(
+  eventType: VeridicusEventType | 'all',
   callback: EventCallback
 ) {
-  const ws = getVeritasWebSocket();
+  const ws = getVeridicusWebSocket();
 
   useEffect(() => {
     ws.on(eventType, callback);
     return () => {
       ws.off(eventType, callback);
     };
-  }, [eventType, callback]);
+  }, [eventType, callback, ws]);
 }
 

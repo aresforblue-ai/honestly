@@ -1,6 +1,6 @@
 "use client";
 
-import { useTokenMetrics, useQuantumJobs } from '@/lib/VERIDICUS-data';
+import { useTokenMetrics, useQuantumJobs } from '@/lib/veridicus-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Activity, Flame, Zap, TrendingUp } from 'lucide-react';
 import { formatNumber } from '@/lib/utils';
@@ -122,7 +122,7 @@ export function OverviewDashboard() {
                   </div>
                   <div className="text-right">
                     <div className="font-medium text-orange-500">
-                      -{formatToken(job.VERIDICUS_burned)} VDC
+                      -{formatToken(job.veridicus_burned)} VDC
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {job.execution_time_ms.toFixed(0)}ms

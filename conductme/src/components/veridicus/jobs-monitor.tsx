@@ -1,11 +1,11 @@
 "use client";
 
-import { useQuantumJobs, useQuantumProviders } from '@/lib/VERIDICUS-data';
+import { useQuantumJobs, useQuantumProviders } from '@/lib/veridicus-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Activity, Clock, Zap } from 'lucide-react';
 import { formatNumber } from '@/lib/utils';
-import { useVERIDICUSWebSocket } from '@/lib/VERIDICUS-websocket';
+import { useVERIDICUSWebSocket } from '@/lib/veridicus-websocket';
 import { useEffect, useState } from 'react';
 
 export function JobsMonitor() {
@@ -47,7 +47,7 @@ export function JobsMonitor() {
     return acc;
   }, {} as Record<string, number>);
 
-  const totalBurned = liveJobs.reduce((sum, job) => sum + (job.VERIDICUS_burned || 0), 0);
+  const totalBurned = liveJobs.reduce((sum, job) => sum + (job.veridicus_burned || 0), 0);
   const avgExecutionTime = liveJobs.length > 0
     ? liveJobs.reduce((sum, job) => sum + (job.execution_time_ms || 0), 0) / liveJobs.length
     : 0;
@@ -220,7 +220,7 @@ export function JobsMonitor() {
                   </div>
                   <div className="text-right ml-4">
                     <div className="font-medium text-orange-500">
-                      -{formatToken(job.VERIDICUS_burned)} VDC
+                      -{formatToken(job.veridicus_burned)} VDC
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {formatTime(job.execution_time_ms)}

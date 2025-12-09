@@ -1,6 +1,6 @@
 "use client";
 
-import { useGovernanceProposals } from '@/lib/VERIDICUS-data';
+import { useGovernanceProposals } from '@/lib/veridicus-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Vote, CheckCircle, XCircle, Clock } from 'lucide-react';
