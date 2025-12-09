@@ -47,21 +47,6 @@ services:
     networks:
       - honestly-network
 
-  # PostgreSQL for GraphQL Backend
-  postgres:
-    image: postgres:16-alpine
-    container_name: honestly-postgres
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: honestly
-      POSTGRES_PASSWORD: honestly123
-      POSTGRES_DB: honestly
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - honestly-network
-
   # Redis for caching (nullifier tracking, vkey cache)
   redis:
     image: redis:7-alpine
@@ -130,7 +115,6 @@ services:
 
 volumes:
   neo4j_data:
-  postgres_data:
   redis_data:
   zkp_artifacts:
 

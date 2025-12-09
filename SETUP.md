@@ -66,7 +66,7 @@ cp backend-graphql/.env.example backend-graphql/.env
 
 ### Step 5: Start Development Servers
 
-Open **three separate terminals**:
+Open **two separate terminals**:
 
 **Terminal 1 - Python Backend:**
 ```bash
@@ -76,31 +76,21 @@ cd backend-python
 uvicorn api.app:app --reload --port 8000
 ```
 
-**Terminal 2 - GraphQL Backend:**
+**Terminal 2 - ConductMe (AI Orchestration):**
 ```bash
-make dev-backend-gql
-# or
-cd backend-graphql
-npm run dev
-```
-
-**Terminal 3 - Frontend:**
-```bash
-make dev-frontend
-# or
-cd frontend-app
+cd conductme
 npm run dev
 ```
 
 ## 🚦 Minimal Stack (simpler dev)
-If you just need the Python API + Neo4j + frontend without Kafka/Postgres/Fabric/FAISS:
+If you just need the Python API + Neo4j without Kafka/Fabric/FAISS:
 
 ```bash
 docker compose -f docker-compose.min.yml up --build
 ```
 
 - Backend API: http://localhost:8000 (REST/GraphQL on FastAPI)
-- Frontend: http://localhost:5173
+- ConductMe: http://localhost:3000
 - Neo4j Browser: http://localhost:7474 (bolt://localhost:7687, neo4j/test)
 
 This uses a single compose file and disables the heavier services.
@@ -109,8 +99,7 @@ This uses a single compose file and disables the heavier services.
 
 Once all services are running:
 
-- **Frontend UI**: http://localhost:3000
-- **GraphQL API**: http://localhost:4000/graphql
+- **ConductMe UI**: http://localhost:3000
 - **Python REST API**: http://localhost:8000/docs
 - **Neo4j Browser**: http://localhost:7474 (user: neo4j, pass: test)
 
@@ -160,10 +149,10 @@ npm run compile:age-level3:cpp
 
 ## 🔧 Detailed Setup Instructions
 
-### Frontend Application Setup
+### ConductMe Setup (AI Orchestration)
 
 ```bash
-cd frontend-app
+cd conductme
 
 # Install dependencies
 npm install
@@ -173,45 +162,6 @@ npm run dev
 
 # Build for production
 npm run build
-
-# Preview production build
-npm run preview
-```
-
-**Environment Variables** (`.env`):
-```env
-REACT_APP_GRAPHQL_URI=http://localhost:4000/graphql
-```
-
-### GraphQL Backend Setup
-
-```bash
-cd backend-graphql
-
-# Install dependencies
-npm install
-
-# Set up environment
-cp .env.example .env
-# Edit .env with your database credentials
-
-# Run development server
-npm run dev
-
-# Run in production
-npm start
-```
-
-**Environment Variables** (`.env`):
-```env
-NODE_ENV=development
-PORT=4000
-DATABASE_URL=postgresql://honestly:honestly123@localhost:5432/honestly
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=test
-GRAPHQL_PATH=/graphql
-CORS_ORIGIN=http://localhost:3000
 ```
 
 ### Python Backend Setup
@@ -250,12 +200,8 @@ make test
 ### Test Individual Components
 
 ```bash
-# Frontend
-cd frontend-app
-npm test
-
-# GraphQL Backend
-cd backend-graphql
+# ConductMe
+cd conductme
 npm test
 
 # Python Backend
@@ -271,8 +217,7 @@ If you get "port already in use" errors:
 
 ```bash
 # Check what's using the port
-lsof -i :3000  # Frontend
-lsof -i :4000  # GraphQL Backend
+lsof -i :3000  # ConductMe
 lsof -i :8000  # Python Backend
 
 # Kill the process or change the port in config
@@ -310,10 +255,6 @@ docker logs honestly-neo4j
 If you need to reset the database:
 
 ```bash
-# GraphQL Backend (if using Prisma)
-cd backend-graphql
-npm run prisma:migrate reset
-
 # Neo4j
 docker exec honestly-neo4j cypher-shell -u neo4j -p test "MATCH (n) DETACH DELETE n"
 ```
@@ -332,21 +273,14 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### Manual Deployment
 
-1. **Frontend**: Build and serve static files
+1. **ConductMe**: Build and serve static files
    ```bash
-   cd frontend-app
+   cd conductme
    npm run build
-   # Serve the dist/ directory with nginx or similar
+   # Serve the .next/ directory with nginx or similar
    ```
 
-2. **GraphQL Backend**: Run with PM2 or similar
-   ```bash
-   cd backend-graphql
-   npm install --production
-   pm2 start src/index.js --name honestly-graphql
-   ```
-
-3. **Python Backend**: Run with Gunicorn
+2. **Python Backend**: Run with Gunicorn
    ```bash
    cd backend-python
    pip install gunicorn
@@ -371,11 +305,11 @@ Before deploying to production:
 
 ## 📚 Additional Resources
 
-- [Frontend README](frontend-app/README.md) - Detailed frontend documentation
-- [GraphQL Backend README](backend-graphql/README.md) - Backend API documentation
+- [ConductMe README](conductme/README.md) - AI orchestration documentation
 - [Python Backend README](backend-python/README.md) - Vault API documentation
+- [VERIDICUS Solana README](backend-solana/README.md) - Solana program documentation
 - [Vault API Docs](docs/vault-api.md) - Complete API reference
-- [Architecture Overview](docs/Scope.md) - System architecture
+- [Architecture Overview](ARCHITECTURE.md) - System architecture
 
 ## 🆘 Getting Help
 
@@ -385,10 +319,10 @@ Before deploying to production:
 
 ## 📝 Next Steps
 
-1. Explore the frontend at http://localhost:3000
-2. Try the GraphQL playground at http://localhost:4000/graphql
-3. Check the REST API docs at http://localhost:8000/docs
-4. Review the documentation in the `docs/` folder
+1. Explore ConductMe at http://localhost:3000
+2. Check the REST API docs at http://localhost:8000/docs
+3. Review the documentation in the `docs/` folder
+4. Set up VERIDICUS Solana program (optional)
 5. Start building your own features!
 
 ---

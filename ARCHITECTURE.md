@@ -98,54 +98,23 @@ This document describes the complete architecture of the Honestly Truth Engine p
 
 ## 🔄 Component Interactions
 
-### 1. Frontend ↔ GraphQL Backend
+### 1. ConductMe ↔ Python Backend
 
-**Protocol**: HTTP/HTTPS with GraphQL
-**Port**: 4000
+**Protocol**: HTTP/HTTPS with REST API
+**Port**: 8000
 
 ```javascript
-// Apollo Client Configuration
-const client = new ApolloClient({
-  uri: 'http://localhost:4000/graphql',
-  cache: new InMemoryCache(),
-});
-```
-
-**Key Operations**:
-- Query apps and trust scores
-- Fetch claims and evidence
-- Display verification status
-- Real-time updates (future: subscriptions)
-
-### 2. GraphQL Backend ↔ Python Backend
-
-**Integration Points**:
-
-**Option A: REST API** (Current)
-```javascript
-// Call Python FastAPI from Node.js
+// Call Python FastAPI from ConductMe
 const response = await fetch('http://localhost:8000/vault/documents');
 ```
 
-**Option B: Shared Database** (Neo4j)
-```javascript
-// Both read from Neo4j
-const neo4jDriver = neo4j.driver(
-  'bolt://localhost:7687',
-  neo4j.auth.basic('neo4j', 'test')
-);
-```
+**Key Operations**:
+- Vault operations (upload, retrieve, share)
+- ZK proof generation and verification
+- AI agent identity protocol (AAIP)
+- Share link management
 
-**Option C: Event Bus** (Kafka)
-```javascript
-// Publish events to Kafka
-kafkaProducer.send({
-  topic: 'app_verified',
-  messages: [{ key: appId, value: JSON.stringify(data) }]
-});
-```
-
-### 3. Python Backend ↔ Data Stores
+### 2. Python Backend ↔ Data Stores
 
 **Neo4j**: Claims, provenance, relationships
 ```python
@@ -175,92 +144,61 @@ index = faiss.IndexFlatL2(dimension)
 
 ## 📊 Data Flow Examples
 
-### Example 1: App Verification Flow
+### Example 1: ZK Proof Generation Flow
 
 ```
-1. User submits app via Frontend
+1. User uploads document via ConductMe
    ↓
-2. Frontend → GraphQL Backend (registerApp mutation)
+2. ConductMe → Python Backend (POST /vault/upload)
    ↓
-3. GraphQL validates and creates App record
+3. Python Backend: Encrypts document (AES-256-GCM)
    ↓
-4. GraphQL → Kafka: Publishes "app_created" event
+4. Python Backend: Generates ZK proof (Groth16)
    ↓
-5. Python Backend: Kafka consumer picks up event
+5. Python Backend: Stores in Neo4j with provenance
    ↓
-6. Python Backend: Stores in Neo4j with provenance
+6. Python Backend → Blockchain: Anchors hash
    ↓
-7. Python Backend → Blockchain: Anchors hash
+7. Python Backend: Returns share link
    ↓
-8. GraphQL Backend: Calculates WhistlerScore
-   ↓
-9. Frontend receives updated app with score
+8. ConductMe: Displays share link to user
 ```
 
-### Example 2: Claim Verification Flow
+### Example 2: AI Agent Identity Verification Flow
 
 ```
-1. User submits claim via API
+1. AI Agent requests reputation proof via API
    ↓
-2. Python Backend: Creates Claim node in Neo4j
+2. Python Backend: Checks agent registry (AAIP)
    ↓
-3. Python Backend: Links evidence to claim
+3. Python Backend: Generates ZK proof (level3_inequality)
    ↓
-4. Python Backend: Generates ZK proof
+4. Python Backend: Tracks nullifier (prevents replay)
    ↓
-5. Python Backend → Blockchain: Anchors attestation
+5. Python Backend: Returns proof + nullifier
    ↓
-6. GraphQL Backend: Queries Neo4j for claims
-   ↓
-7. Frontend: Displays claim with verification status
+6. AI Agent: Uses proof for authentication
 ```
 
-### Example 3: Trust Score Calculation
+### Example 3: VERIDICUS Quantum Job Execution
 
 ```
-1. Frontend requests app score
+1. User calls execute_quantum_job on Solana
    ↓
-2. GraphQL Backend: Fetches app data
+2. VERIDICUS Program: Validates rate limits
    ↓
-3. Scoring Engine analyzes:
-   - Reviews (sentiment analysis)
-   - Claims (verdict outcomes)
-   - Privacy signals
-   - Financial transparency
-   - AI anomaly detection
+3. VERIDICUS Program: Fetches SOL/USD price from Pyth
    ↓
-4. Weighted calculation produces score (0-100)
+4. VERIDICUS Program: Calculates dynamic burn amount
    ↓
-5. Grade assigned (A-F)
+5. VERIDICUS Program: Burns tokens based on qubits
    ↓
-6. Breakdown returned to frontend
+6. VERIDICUS Program: Updates job counter
+   ↓
+7. Event emitted: QuantumJobExecuted
 ```
 
 ## 🗄️ Database Schema
-
-### PostgreSQL (GraphQL Backend)
-
-Used for structured app data (if using Prisma):
-
-```sql
--- Apps table
-CREATE TABLE apps (
-  id UUID PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  platform VARCHAR(50) NOT NULL,
-  whistler_score INTEGER,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Reviews table
-CREATE TABLE reviews (
-  id UUID PRIMARY KEY,
-  app_id UUID REFERENCES apps(id),
-  content TEXT,
-  rating INTEGER,
-  sentiment JSONB
-);
-```
 
 ### Neo4j (Python Backend)
 
@@ -268,17 +206,15 @@ Graph-based claim and provenance storage:
 
 ```cypher
 // Nodes
-(:App {id, name, platform})
-(:Claim {id, statement, hash})
-(:Evidence {id, text, snapshot_hash})
-(:Verdict {id, outcome, confidence})
-(:Document {id, type, encrypted_path})
+(:Document {id, type, encrypted_path, hash})
+(:Agent {id, name, operator_id, capabilities})
+(:Proof {id, circuit, nullifier, verified})
+(:ShareLink {token, document_id, access_level})
 
 // Relationships
-(:App)-[:HAS_CLAIM]->(:Claim)
-(:Claim)-[:SUPPORTED_BY]->(:Evidence)
-(:Claim)-[:JUDGED_BY]->(:Verdict)
-(:Evidence)-[:DERIVED_FROM]->(:Evidence)
+(:Document)-[:HAS_PROOF]->(:Proof)
+(:Document)-[:HAS_SHARE_LINK]->(:ShareLink)
+(:Agent)-[:HAS_REPUTATION]->(:Proof)
 ```
 
 ## 🔐 Security Architecture
@@ -387,16 +323,6 @@ def generate_authenticity_proof(document_hash, merkle_root, merkle_proof):
 - **Performance**: <1s verification, <0.2s with caching
 
 ## 🚦 API Endpoints
-
-### GraphQL Backend (Port 4000)
-
-```graphql
-# Main endpoint
-POST /graphql
-
-# Health check
-GET /health
-```
 
 ### Python Backend (Port 8000)
 
