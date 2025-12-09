@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Honestly - AI Agent Identity Protocol (AAIP)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+        }
+
+        .slide {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 80px;
+            page-break-after: always;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slide::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 30px;
+            right: 40px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.3);
+            font-weight: 300;
+        }
+
+        .logo {
+            position: absolute;
+            top: 40px;
+            left: 40px;
+            font-size: 24px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        h1 {
+            font-size: 72px;
+            font-weight: 900;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        h2 {
+            font-size: 56px;
+            font-weight: 700;
+            margin-bottom: 40px;
+            color: #ffffff;
+            text-align: center;
+        }
+
+        h3 {
+            font-size: 36px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+
+        p {
+            font-size: 24px;
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.85);
+            max-width: 900px;
+            text-align: center;
+            margin: 0 auto 20px;
+        }
+
+        .subtitle {
+            font-size: 32px;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: 300;
+            text-align: center;
+            max-width: 800px;
+        }
+
+        .highlight {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .problem-box {
+            background: rgba(220, 38, 38, 0.1);
+            border-left: 4px solid #dc2626;
+            padding: 30px;
+            margin: 20px auto;
+            max-width: 800px;
+            border-radius: 8px;
+        }
+
+        .solution-box {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+            padding: 30px;
+            margin: 20px auto;
+            max-width: 800px;
+            border-radius: 8px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            max-width: 1000px;
+            margin: 40px auto;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        .feature-card h3 {
+            font-size: 24px;
+            margin-bottom: 15px;
+        }
+
+        .feature-card p {
+            font-size: 18px;
+            text-align: left;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 40px;
+            max-width: 1000px;
+            margin: 40px auto;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 64px;
+            font-weight: 900;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .code-block {
+            background: #1a1a2e;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            padding: 30px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            text-align: left;
+            max-width: 800px;
+            margin: 20px auto;
+            color: #22c55e;
+        }
+
+        .timeline {
+            display: flex;
+            justify-content: space-around;
+            max-width: 1000px;
+            margin: 40px auto;
+            position: relative;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            top: 30px;
+            left: 10%;
+            right: 10%;
+            height: 2px;
+            background: rgba(102, 126, 234, 0.3);
+        }
+
+        .timeline-item {
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .timeline-dot {
+            width: 60px;
+            height: 60px;
+            background: #667eea;
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .timeline-label {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 10px;
+        }
+
+        .timeline-content {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        ul {
+            list-style: none;
+            max-width: 800px;
+            margin: 20px auto;
+        }
+
+        li {
+            font-size: 22px;
+            line-height: 1.8;
+            color: rgba(255, 255, 255, 0.85);
+            padding-left: 40px;
+            position: relative;
+            text-align: left;
+        }
+
+        li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #22c55e;
+            font-weight: 700;
+            font-size: 24px;
+        }
+
+        .cta {
+            margin-top: 50px;
+            font-size: 28px;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .grant-table {
+            max-width: 900px;
+            margin: 40px auto;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .grant-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            padding: 20px 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .grant-row:first-child {
+            background: rgba(102, 126, 234, 0.2);
+            font-weight: 700;
+        }
+
+        .grant-cell {
+            font-size: 18px;
+        }
+
+        @media print {
+            .slide {
+                page-break-after: always;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Slide 1: Cover -->
+    <div class="slide">
+        <h1>Honestly</h1>
+        <p class="subtitle">Cryptographic Passports for AI Agents</p>
+        <p style="margin-top: 60px; font-size: 20px; color: rgba(255,255,255,0.5);">AI Agent Identity Protocol (AAIP)</p>
+        <div class="slide-number">1</div>
+    </div>
+
+    <!-- Slide 2: One-Liner -->
+    <div class="slide">
+        <div class="logo">Honestly</div>
+        <h2>The Elevator Pitch</h2>
+        <div class="solution-box">
+            <p style="font-size: 32px; font-weight: 600; line-height: 1.4;">
+                "We built cryptographic passports for AI agents - the first zero-knowledge identity protocol that proves an agent's reputation and capabilities without revealing its secrets."
+            </p>
+        </div>
+        <div class="slide-number">2</div>
+    </div>
+
+    <!-- Slide 3: The Problem -->
+    <div class="slide">
+        <div class="logo">Honestly</div>
+        <h2>The Problem</h2>
+        <div class="problem-box">
+            <p style="text-align: left; font-size: 22px; margin-bottom: 20px;">
+                <strong>AI agents are proliferating everywhere</strong> - trading crypto, writing code, managing infrastructure.
+            </p>
+            <p style="text-align: left; font-size: 22px;">
+                But there's <span class="highlight">no way to verify</span> if an agent is who it claims to be or if it's trustworthy.
+            </p>
+        </div>
+        <ul>
+            <li>Anyone can claim to be "Claude" or "GPT-4"</li>
+            <li>No cryptographic proof of reputation</li>
+            <li>No verification of capabilities</li>
+            <li>Massive security risk as agents interact with APIs, blockchains, money</li>
+        </ul>
+        <div class="slide-number">3</div>
+    </div>
+
+    <!-- Slide 4: Market Urgency -->
+    <div class="slide">
+        <div class="logo">Honestly</div>
+        <h2>Why Now?</h2>
+        <div class="stats-grid">
+            <div class="stat">
+                <div class="stat-number">80K+</div>
+                <div class="stat-label">LangChain GitHub Stars<br>(millions of deployments)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">$1B+</div>
+                <div class="stat-label">Lost to AI-powered<br>crypto scams in 2024</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">2025</div>
+                <div class="stat-label">EU AI Act requires<br>AI system identification</div>
+            </div>
+        </div>
+        <p style="margin-top: 40px; font-size: 28px; font-weight: 600;">
+            Regulation + billion-dollar fraud = urgent demand for verifiable AI identity
+        </p>
+        <div class="slide-number">4</div>
+    </div>
+
+    <!-- Slide 5: The Solution -->
+    <div class="slide">
+        <div class="logo">Honestly</div>
+        <h2>Our Solution: AAIP</h2>
+        <p class="subtitle">AI Agent Identity Protocol</p>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>🔐 W3C DIDs</h3>
+                <p>Standards-compliant identity:<br><code>did:honestly:agent:claude-opus</code></p>
+            </div>
+            <div class="feature-card">
+                <h3>🎭 ZK Proofs</h3>
+                <p>Prove reputation > threshold without revealing actual score (Groth16 ZK-SNARKs)</p>
+            </div>
+            <div class="feature-card">
+                <h3>✅ Capability Verification</h3>
+                <p>Cryptographically prove what an agent can do without exposing architecture</p>
+            </div>
+            <div class="feature-card">
+                <h3>🛡️ Replay Prevention</h3>
+                <p>Redis-backed nullifier tracking - each proof is unique and non-reusable</p>
+            </div>
+        </div>
+        <div class="slide-number">5</div>
+    </div>
+
+    <!-- Slide 6: How It Works -->
+    <div class="slide">
+        <div class="logo">Honestly</div>
+        <h2>How It Works</h2>
+        <div class="code-block">
+# 1. Register AI agent<br>
+agent = register_ai_agent(<br>
+&nbsp;&nbsp;name="claude-opus",<br>
+&nbsp;&nbsp;capabilities=["reasoning", "code_gen"]<br>
+)<br>
+<span style="color: rgba(255,255,255,0.5);"># Returns: did:honestly:agent:claude-opus</span><br>
+<br>
+# 2. Generate ZK proof of reputation<br>
+proof = get_agent_reputation(<br>
+&nbsp;&nbsp;agent_id="claude-opus",<br>
+&nbsp;&nbsp;threshold=40  <span style="color: rgba(255,255,255,0.5);"># Prove > 40 without revealing score</span><br>
+)<br>
+<br>
+# 3. Verify the proof<br>
+verify_zk_proof(proof)<br>
+<span style="color: rgba(255,255,255,0.5);"># Returns: {"verified": true, "nullifier_valid": true}</span>
+        </div>
+        <p style="margin-top: 30px;">Real Groth16 ZK-SNARKs, not simulations. Production-ready cryptography.</p>
+        <div class="slide-number">6</div>
+    </div>
+
+    <!-- Slide 7: Technical Innovation -->
+    <div class="slide">
+        <div class="logo">Honestly</div>
+        <h2>Technical Innovation</h2>
+        <div class="solution-box">
+            <p style="text-align: left; font-size: 24px; font-weight: 600; margin-bottom: 20px;">
+                First production implementation of zero-knowledge proofs for AI agent authentication
+            </p>
+        </div>
+        <ul>
+            <li><strong>Novel ZK Circuit:</strong> Level3Inequality.circom for reputation threshold proofs</li>
+            <li><strong>Identity Binding:</strong> Poseidon hashing prevents proof forgery</li>
+            <li><strong>Standards Compliant:</strong> W3C DIDs + Verifiable Credentials</li>
+            <li><strong>Production Cryptography:</strong> Groth16 (same as Ethereum ZK rollups)</li>
+            <li><strong>Replay Protection:</strong> Nullifier tracking with Redis persistence</li>
+        </ul>
+        <p style="margin-top: 40px; font-size: 20px; color: rgba(255,255,255,0.6);">
+            We extended standard ZK-SNARK circuits (age verification) to AI agent reputation - a novel contribution.
+        </p>
+        <div class="slide-number">7</div>
+    </div>
+
+    <!-- Slide 8: Traction -->
+    <div class="slide">
+        <div class="logo">Honestly</div>
+        <h2>Traction & Status</h2>
+        <div class="stats-grid">
+            <div class="stat">
+                <div class="stat-number">13K</div>
+                <div class="stat-label">Lines of Production Code</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">80%</div>
+                <div class="stat-label">Complete<br>(2-3 weeks to MVP)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">MIT</div>
+                <div class="stat-label">Open Source License</div>
+            </div>
+        </div>
+        <ul style="margin-top: 40px;">
+            <li>Real Groth16 ZK circuits implemented</li>
+            <li>FastAPI + GraphQL backend architecture</li>
+            <li>Neo4j graph database for identity relationships</li>
+            <li>CI/CD pipeline with security scanning</li>
+            <li>Comprehensive testing framework</li>
+        </ul>
+        <div class="slide-number">8</div>
+    </div>
+
+    <!-- Slide 9: Go-to-Market -->
+    <div class="slide">
+        <div class="logo">Honestly</div>
+        <h2>Integrations & Adoption</h2>
+        <p class="subtitle">Target: Become identity layer for AI agent economy</p>
+        <div class="feature-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-top: 50px;">
+            <div class="feature-card">
+                <h3>LangChain</h3>
+                <p>80K+ stars<br>Integration: npm package for agent identity</p>
+            </div>
+            <div class="feature-card">
+                <h3>AutoGPT</h3>
+                <p>155K+ stars<br>Plugin for autonomous agent verification</p>
+            </div>
+            <div class="feature-card">
+                <h3>Anthropic</h3>
+                <p>Claude agents<br>Native identity integration</p>
+            </div>
+        </div>
+        <p style="margin-top: 50px; font-size: 22px;">
+            <strong>Distribution Strategy:</strong> Developer tools → ecosystem adoption → standard protocol
+        </p>
+        <div class="slide-number">9</div>
+    </div>
+
+    <!-- Slide 10: Roadmap -->
+    <div class="slide">
+        <div class="logo">Honestly</div>
+        <h2>Roadmap</h2>
+        <div class="timeline">
+            <div class="timeline-item">
+                <div class="timeline-dot">1</div>
+                <div class="timeline-label">Weeks 1-4</div>
+                <div class="timeline-content">Production<br>Launch</div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot">2</div>
+                <div class="timeline-label">Weeks 5-12</div>
+                <div class="timeline-content">Framework<br>Integrations</div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-dot">3</div>
+                <div class="timeline-label">Weeks 13-24</div>
+                <div class="timeline-content">Standards<br>Track</div>
+            </div>
+        </div>
+        <ul style="margin-top: 60px;">
+            <li><strong>Phase 1:</strong> Live demo, security audit, ZK circuits compiled</li>
+            <li><strong>Phase 2:</strong> LangChain/AutoGPT plugins, 1K+ agent registrations</li>
+            <li><strong>Phase 3:</strong> W3C DID Method spec, academic paper, 10K+ agents</li>
+        </ul>
+        <div class="slide-number">10</div>
+    </div>
+
+    <!-- Slide 11: Funding Ask -->
+    <div class="slide">
+        <div class="logo">Honestly</div>
+        <h2>Funding Strategy</h2>
+        <div class="grant-table">
+            <div class="grant-row">
+                <div class="grant-cell">Grant Program</div>
+                <div class="grant-cell">Amount</div>
+                <div class="grant-cell">Timeline</div>
+            </div>
+            <div class="grant-row">
+                <div class="grant-cell">Ethereum ESP</div>
+                <div class="grant-cell">$100K-$500K</div>
+                <div class="grant-cell">8-12 weeks</div>
+            </div>
+            <div class="grant-row">
+                <div class="grant-cell">Polygon Grants</div>
+                <div class="grant-cell">$50K-$100K</div>
+                <div class="grant-cell">4-8 weeks</div>
+            </div>
+            <div class="grant-row">
+                <div class="grant-cell">Gitcoin GR20</div>
+                <div class="grant-cell">$10K-$50K</div>
+                <div class="grant-cell">2-4 weeks</div>
+            </div>
+            <div class="grant-row">
+                <div class="grant-cell">Questbook DAOs</div>
+                <div class="grant-cell">$25K-$30K</div>
+                <div class="grant-cell">4-6 weeks</div>
+            </div>
+        </div>
+        <p style="margin-top: 40px; font-size: 24px; font-weight: 600;">
+            Target: $75K-$250K across multiple grants in 6 months
+        </p>
+        <div class="slide-number">11</div>
+    </div>
+
+    <!-- Slide 12: Use of Funds -->
+    <div class="slide">
+        <div class="logo">Honestly</div>
+        <h2>Use of Funds</h2>
+        <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="stat">
+                <div class="stat-number">50%</div>
+                <div class="stat-label">Development<br>(integrations, optimization)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">20%</div>
+                <div class="stat-label">Infrastructure<br>(hosting, monitoring)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">15%</div>
+                <div class="stat-label">Security<br>(audits, bug bounties)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">15%</div>
+                <div class="stat-label">Community<br>(docs, marketing)</div>
+            </div>
+        </div>
+        <ul style="margin-top: 60px;">
+            <li>Complete ZK circuit compilation and testing</li>
+            <li>Production deployment with monitoring</li>
+            <li>External security audit (Trail of Bits / Least Authority)</li>
+            <li>LangChain/AutoGPT integration packages</li>
+            <li>Documentation, tutorials, conference talks</li>
+        </ul>
+        <div class="slide-number">12</div>
+    </div>
+
+    <!-- Slide 13: Why We'll Win -->
+    <div class="slide">
+        <div class="logo">Honestly</div>
+        <h2>Unfair Advantages</h2>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>🥇 First Mover</h3>
+                <p>No competitor has production ZK proofs for AI agents</p>
+            </div>
+            <div class="feature-card">
+                <h3>⚡ Real Tech</h3>
+                <p>13K LOC production code, not a whitepaper</p>
+            </div>
+            <div class="feature-card">
+                <h3>⏰ Perfect Timing</h3>
+                <p>AI safety is 2025's #1 priority (regulation incoming)</p>
+            </div>
+            <div class="feature-card">
+                <h3>🔧 Composable</h3>
+                <p>Works with existing standards (W3C DIDs, VCs)</p>
+            </div>
+        </div>
+        <p style="margin-top: 50px; font-size: 28px; font-weight: 600;">
+            We're building infrastructure the ecosystem needs <span class="highlight">right now</span>
+        </p>
+        <div class="slide-number">13</div>
+    </div>
+
+    <!-- Slide 14: Impact -->
+    <div class="slide">
+        <div class="logo">Honestly</div>
+        <h2>Impact & Public Good</h2>
+        <ul style="margin-top: 40px;">
+            <li><strong>For Developers:</strong> Trustless agent-to-agent interaction, reduced liability</li>
+            <li><strong>For End Users:</strong> Verify agent reputation before trusting with money/data</li>
+            <li><strong>For Researchers:</strong> Novel ZK-SNARK application, reproducible benchmarks</li>
+            <li><strong>For Regulators:</strong> Compliance-friendly agent tracking and audit trails</li>
+        </ul>
+        <div class="solution-box" style="margin-top: 50px;">
+            <p style="font-size: 26px; font-weight: 600;">
+                AAIP becomes the identity layer for the AI agent economy, just like HTTPS for secure web browsing
+            </p>
+        </div>
+        <p style="margin-top: 30px; font-size: 20px; color: rgba(255,255,255,0.6);">
+            Expected adoption: 100K+ agents within 2 years
+        </p>
+        <div class="slide-number">14</div>
+    </div>
+
+    <!-- Slide 15: Call to Action -->
+    <div class="slide">
+        <div class="logo">Honestly</div>
+        <h1 style="font-size: 56px; margin-bottom: 40px;">Let's Build Trust in<br>the AI Agent Economy</h1>
+        <p style="font-size: 28px; margin-bottom: 20px;">
+            <strong>GitHub:</strong> github.com/aresforblue-ai/honestly
+        </p>
+        <p style="font-size: 28px; margin-bottom: 20px;">
+            <strong>Demo:</strong> honestly.app (coming soon)
+        </p>
+        <p style="font-size: 28px; margin-bottom: 60px;">
+            <strong>Contact:</strong> [your-email]
+        </p>
+        <div class="solution-box">
+            <p style="font-size: 24px; font-weight: 600;">
+                We're building the missing cryptographic infrastructure.<br>Join us.
+            </p>
+        </div>
+        <div class="slide-number">15</div>
+    </div>
+
+</body>
+</html>
