@@ -14,8 +14,8 @@ from vector_index.faiss_index import FaissIndex
 
 # Import shared utilities (avoids circular imports)
 from api.utils import (
-    get_verification_key_hash, verification_keys_ready,
-    load_verification_key_hashes, get_artifacts_dir
+    get_vkey_hash, vkeys_ready,
+    load_vkey_hashes, get_artifacts_dir
 )
 
 # Import vault resolvers and routes
@@ -92,43 +92,43 @@ query = QueryType()
 
 @query.field("claim")
 def resolve_claim(_, info, id):
-    cypher_query = "MATCH (c:Claim {id:$id})<-[:REPORTS]-(s:Source) RETURN c, s LIMIT 1"
-    query_results = graph.run(cypher_query, id=id).data()
-    if not query_results:
+    q = "MATCH (c:Claim {id:$id})<-[:REPORTS]-(s:Source) RETURN c, s LIMIT 1"
+    res = graph.run(q, id=id).data()
+    if not res:
         raise HTTPException(status_code=404, detail="Claim not found")
-    claim_node = query_results[0]['c']
-    source_node = query_results[0]['s']
+    c = res[0]['c']
+    s = res[0]['s']
     return {
-        "id": claim_node['id'],
-        "text": claim_node.get('text'),
-        "veracity": float(claim_node.get('veracity', 0.5)),
-        "state": claim_node.get('state'),
-        "timestamp": str(claim_node.get('timestamp')) if claim_node.get('timestamp') else None,
-        "source": source_node.get('name'),
-        "provenance": claim_node.get('provenance')
+        "id": c['id'],
+        "text": c.get('text'),
+        "veracity": float(c.get('veracity', 0.5)),
+        "state": c.get('state'),
+        "timestamp": str(c.get('timestamp')) if c.get('timestamp') else None,
+        "source": s.get('name'),
+        "provenance": c.get('provenance')
     }
 
 @query.field("search")
 def resolve_search(_, info, query, topK=5):
-    query_vector = embed_model.encode(query)
-    search_results = faiss.search(query_vector, top_k=topK)
+    vec = embed_model.encode(query)
+    results = faiss.search(vec, top_k=topK)
     claims = []
-    for result_item in search_results:
+    for r in results:
         # fetch claim metadata from Neo4j
-        cypher_query = "MATCH (c:Claim {id:$id})<-[:REPORTS]-(s:Source) RETURN c, s LIMIT 1"
-        query_results = graph.run(cypher_query, id=result_item['id']).data()
-        if not query_results:
+        q = "MATCH (c:Claim {id:$id})<-[:REPORTS]-(s:Source) RETURN c, s LIMIT 1"
+        res = graph.run(q, id=r['id']).data()
+        if not res:
             continue
-        claim_node = query_results[0]['c']
-        source_node = query_results[0]['s']
+        c = res[0]['c']
+        s = res[0]['s']
         claims.append({
-            "id": claim_node['id'],
-            "text": claim_node.get('text'),
-            "veracity": float(claim_node.get('veracity', 0.5)),
-            "state": claim_node.get('state'),
-            "timestamp": str(claim_node.get('timestamp')) if claim_node.get('timestamp') else None,
-            "source": source_node.get('name'),
-            "provenance": claim_node.get('provenance')
+            "id": c['id'],
+            "text": c.get('text'),
+            "veracity": float(c.get('veracity', 0.5)),
+            "state": c.get('state'),
+            "timestamp": str(c.get('timestamp')) if c.get('timestamp') else None,
+            "source": s.get('name'),
+            "provenance": c.get('provenance')
         })
     return claims
 
@@ -137,15 +137,15 @@ def resolve_search(_, info, query, topK=5):
 @query.field("apps")
 def resolve_apps(_, info):
     """Get all apps/entities from Neo4j."""
-    cypher_query = """
+    q = """
     MATCH (a:App)
     OPTIONAL MATCH (a)-[:HAS_CLAIM]->(c:Claim)
     OPTIONAL MATCH (a)-[:HAS_REVIEW]->(r:Review)
     RETURN a, collect(DISTINCT c) as claims, collect(DISTINCT r) as reviews
     """
-    query_results = graph.run(cypher_query).data()
+    results = graph.run(q).data()
     apps = []
-    for record in query_results:
+    for record in results:
         app_node = record['a']
         if not app_node:
             continue
@@ -158,8 +158,8 @@ def resolve_apps(_, info):
                 "category": app_node.get('category'),
                 "description": app_node.get('description'),
             },
-            "claims": [dict(claim) for claim in record.get('claims', []) if claim],
-            "reviews": [dict(review) for review in record.get('reviews', []) if review],
+            "claims": [dict(c) for c in record.get('claims', []) if c],
+            "reviews": [dict(r) for r in record.get('reviews', []) if r],
         })
     return apps
 
@@ -167,7 +167,7 @@ def resolve_apps(_, info):
 @query.field("app")
 def resolve_app(_, info, id):
     """Get a specific app by ID."""
-    cypher_query = """
+    q = """
     MATCH (a:App {id: $id})
     OPTIONAL MATCH (a)-[:HAS_CLAIM]->(c:Claim)
     OPTIONAL MATCH (c)<-[:REPORTS]-(s:Source)
@@ -177,40 +177,40 @@ def resolve_app(_, info, id):
            collect(DISTINCT {claim: c, source: s, verdicts: collect(DISTINCT v)}) as claims,
            collect(DISTINCT r) as reviews
     """
-    query_results = graph.run(cypher_query, id=id).data()
-    if not query_results or not query_results[0].get('a'):
+    results = graph.run(q, id=id).data()
+    if not results or not results[0].get('a'):
         return None
     
-    record = query_results[0]
+    record = results[0]
     app_node = record['a']
     
     claims = []
     for claim_data in record.get('claims', []):
-        claim_node = claim_data.get('claim')
-        if not claim_node:
+        c = claim_data.get('claim')
+        if not c:
             continue
         verdicts = claim_data.get('verdicts', [])
         claims.append({
-            "id": claim_node.get('id'),
-            "statement": claim_node.get('text') or claim_node.get('statement'),
-            "claimHash": claim_node.get('hash') or claim_node.get('claimHash', ''),
+            "id": c.get('id'),
+            "statement": c.get('text') or c.get('statement'),
+            "claimHash": c.get('hash') or c.get('claimHash', ''),
             "verdicts": [
                 {
-                    "outcome": verdict.get('outcome', 'UNKNOWN'),
-                    "confidence": float(verdict.get('confidence', 0.5))
+                    "outcome": v.get('outcome', 'UNKNOWN'),
+                    "confidence": float(v.get('confidence', 0.5))
                 }
-                for verdict in verdicts if verdict
+                for v in verdicts if v
             ]
         })
     
     reviews = []
-    for review_node in record.get('reviews', []):
-        if review_node:
+    for r in record.get('reviews', []):
+        if r:
             reviews.append({
-                "id": review_node.get('id'),
-                "rating": float(review_node.get('rating', 0)),
-                "sentiment": review_node.get('sentiment', 'NEUTRAL'),
-                "text": review_node.get('text'),
+                "id": r.get('id'),
+                "rating": float(r.get('rating', 0)),
+                "sentiment": r.get('sentiment', 'NEUTRAL'),
+                "text": r.get('text'),
             })
     
     return {
@@ -377,7 +377,7 @@ async def integrity_middleware(request, call_next):
         _rate_check(f"{path}:{request.client.host}")
     # Fail fast if vkeys missing for critical endpoints
     if path.startswith("/vault/share") or path.startswith("/zkp/artifacts"):
-        if not verification_keys_ready():
+        if not vkeys_ready():
             return Response(
                 content='{"detail":"Verification keys unavailable"}',
                 status_code=503,
@@ -388,7 +388,7 @@ async def integrity_middleware(request, call_next):
     if path.startswith("/zkp/artifacts") and path.endswith("verification_key.json"):
         parts = path.strip("/").split("/")
         circuit = parts[-2] if len(parts) >= 2 else ""
-        etag = get_verification_key_hash(circuit)
+        etag = get_vkey_hash(circuit)
         if etag:
             response.headers.setdefault("ETag", etag)
         response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
@@ -461,8 +461,8 @@ if PROMETHEUS_AVAILABLE:
 @app.on_event("startup")
 async def startup_event():
     """Load critical artifacts on startup."""
-    load_verification_key_hashes()
-    if not verification_keys_ready():
+    load_vkey_hashes()
+    if not vkeys_ready():
         raise RuntimeError("Verification keys are not loaded; startup gating failed.")
 
 # Root endpoint
@@ -485,7 +485,7 @@ async def health_live():
 @app.get("/health/ready")
 async def health_ready():
     """Readiness probe: checks vkeys and Neo4j connectivity."""
-    vkeys_ok = verification_keys_ready()
+    vkeys_ok = vkeys_ready()
     neo4j_ok = False
     try:
         graph.run("RETURN 1").evaluate()
@@ -519,7 +519,7 @@ async def capabilities():
                 "public_inputs": ["minAgeOut", "referenceTsOut", "documentHashOut", "commitment"],
                 "endpoint": "/vault/share/{token}/bundle",
                 "vk": "/zkp/artifacts/age/verification_key.json",
-                "vk_sha256": get_verification_key_hash("age"),
+                "vk_sha256": get_vkey_hash("age"),
             },
             {
                 "type": "authenticity_proof",
@@ -527,7 +527,7 @@ async def capabilities():
                 "public_inputs": ["rootOut", "leafOut"],
                 "endpoint": "/vault/share/{token}/bundle",
                 "vk": "/zkp/artifacts/authenticity/verification_key.json",
-                "vk_sha256": get_verification_key_hash("authenticity"),
+                "vk_sha256": get_vkey_hash("authenticity"),
             },
         ],
         "hmac": bool(HMAC_SECRET),
