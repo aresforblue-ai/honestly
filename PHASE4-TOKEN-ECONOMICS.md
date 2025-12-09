@@ -25,9 +25,9 @@
 
 ---
 
-## 💡 Option: Add Native Token (HONESTLY Token)
+## 💡 Option: Add Native Token (VERITAS Token)
 
-We could add a native `HONESTLY` token for protocol value capture while keeping LINK for staking.
+We could add a native `VERITAS` token for protocol value capture while keeping LINK for staking.
 
 ### Hybrid Model (Recommended)
 
@@ -42,12 +42,12 @@ We could add a native `HONESTLY` token for protocol value capture while keeping 
 │  ├─ Rewards (10% from slash pool)               │
 │  └─ Dispute bonds (5% of stake at risk)         │
 │                                                 │
-│  HONESTLY (Protocol Token)                      │
-│  ├─ Governance (voting on parameters)           │
-│  ├─ Fee discounts (lower staking requirements)  │
-│  ├─ Protocol revenue share (from slash pool)    │
-│  ├─ Early adopter rewards (airdrops)            │
-│  └─ Oracle node rewards (bonus for validators)  │
+│  VERITAS (Protocol Token)                        │
+│  ├─ Governance (voting on parameters)             │
+│  ├─ Fee discounts (lower staking requirements)    │
+│  ├─ Protocol revenue share (from slash pool)      │
+│  ├─ Early adopter rewards (airdrops)             │
+│  └─ Oracle node rewards (bonus for validators)   │
 │                                                 │
 └─────────────────────────────────────────────────┘
 ```
@@ -55,7 +55,7 @@ We could add a native `HONESTLY` token for protocol value capture while keeping 
 ### Implementation Options
 
 #### Option A: Governance Token Only
-- **HONESTLY** token for voting on:
+- **VERITAS** token for voting on:
   - Staking thresholds
   - Slash percentages
   - Oracle quorum size
@@ -84,44 +84,49 @@ We could add a native `HONESTLY` token for protocol value capture while keeping 
 - Build user base
 - Prove the model
 
-### Phase 4.5 (Later): Add HONESTLY Governance Token
-- Launch HONESTLY token
+### Phase 4.5 (Later): Add VERITAS Governance Token
+- Launch VERITAS token
 - Use for governance only (no staking)
 - Airdrop to early reporters
 - Revenue share from protocol fees
 
 ### Phase 5.0 (Future): Full Dual Token
-- HONESTLY staking for protocol benefits
+- VERITAS staking for protocol benefits
 - LINK still required for anomaly reporting
 - Revenue sharing model
 
 ---
 
-## 💰 If We Add HONESTLY Token
+## 💰 If We Add VERITAS Token
 
-### Token Distribution (Example)
+### Token Distribution (Mission-Driven, No Initial Sale)
 
 ```
-Total Supply: 1,000,000,000 HONESTLY
+Total Supply: 1,000,000 VERITAS (1M - Small, Focused)
 
-├─ 40% Community Rewards (400M)
-│  ├─ Early reporters (100M)
-│  ├─ Oracle nodes (100M)
-│  ├─ Protocol contributors (100M)
-│  └─ Future airdrops (100M)
+├─ 60% Community Rewards (600K)
+│  ├─ Early reporters (200K)
+│  ├─ Oracle nodes (150K)
+│  ├─ Protocol contributors (150K)
+│  └─ Future community growth (100K)
 │
-├─ 30% Protocol Treasury (300M)
-│  ├─ Development (100M)
-│  ├─ Marketing (50M)
-│  ├─ Partnerships (50M)
-│  └─ Reserve (100M)
+├─ 30% Protocol Treasury (300K)
+│  ├─ Development & maintenance (150K)
+│  ├─ Open source grants (100K)
+│  └─ Emergency reserve (50K)
 │
-├─ 20% Team & Advisors (200M)
-│  ├─ 4-year vesting
-│  └─ 1-year cliff
-│
-└─ 10% Public Sale (100M)
-   └─ Fair launch / IDO
+└─ 10% Team (100K)
+   ├─ 4-year vesting
+   └─ 1-year cliff
+   └─ Mission-aligned only
+
+PHASE 4: NO PUBLIC SALE - Pure utility token
+PHASE 4: NO SPECULATION - Focus on real value
+PHASE 4: NO GREED - Help people, not profit
+
+FUTURE: Option to sell from treasury if needed for growth
+FUTURE: Governance decides - community votes on any sale
+FUTURE: Funds go to protocol development, not personal gain
 ```
 
 ### Use Cases
@@ -132,17 +137,32 @@ Total Supply: 1,000,000,000 HONESTLY
    - Vote on oracle upgrades
 
 2. **Fee Discounts**
-   - Hold 10K HONESTLY → 10% discount on staking requirements
-   - Hold 50K HONESTLY → 25% discount
-   - Hold 200K HONESTLY → 50% discount (Gold tier at Silver price)
+   - Hold 1K VERITAS → 10% discount on staking requirements
+   - Hold 5K VERITAS → 25% discount
+   - Hold 20K VERITAS → 50% discount (Gold tier at Silver price)
+   - **Lower thresholds with 1M supply**
 
-3. **Revenue Share**
-   - Stake HONESTLY → earn % of protocol fees
-   - From slash pool, dispute bonds, etc.
+3. **Community Rewards**
+   - Contributors earn VERITAS for:
+     - Finding bugs (security rewards)
+     - Writing documentation
+     - Building integrations
+     - Helping other users
+   - **Reward helpfulness, not speculation**
 
 4. **Oracle Rewards**
-   - Oracle nodes earn HONESTLY for accurate validations
+   - Oracle nodes earn VERITAS for accurate validations
    - Bonus for high uptime
+   - **Incentivize quality, not quantity**
+
+5. **Open Source Grants**
+   - Protocol treasury funds open source work
+   - Grants for:
+     - Circuit improvements
+     - Security audits
+     - Educational content
+     - Tooling development
+   - **Support the ecosystem, not ourselves**
 
 ---
 
@@ -153,7 +173,7 @@ Total Supply: 1,000,000,000 HONESTLY
 - ✅ No token launch complexity
 - ✅ Focus on tech first
 
-**Option 2: Add HONESTLY Governance Token**
+**Option 2: Add VERITAS Governance Token**
 - ✅ Protocol value capture
 - ✅ Community ownership
 - ✅ Future revenue sharing
@@ -167,20 +187,36 @@ Total Supply: 1,000,000,000 HONESTLY
 
 ## 📝 If We Add Token, Here's What We'd Build
 
-### New Contract: `HonestlyToken.sol`
+### New Contract: `VeritasToken.sol`
 ```solidity
-contract HonestlyToken is ERC20, ERC20Votes {
-    // Governance token with voting
-    // Revenue sharing
-    // Fee discounts
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract VeritasToken is ERC20, ERC20Votes {
+    // Mission: Help people verify AI agents
+    // No sale, no speculation, pure utility
+    
+    uint256 public constant MAX_SUPPLY = 1_000_000; // 1M total
+    
+    constructor() ERC20("Veritas", "VERITAS") ERC20Permit("Veritas") {
+        // Mint to treasury for community distribution
+        // No public sale - all distributed via:
+        // - Community rewards
+        // - Contributor grants
+        // - Open source funding
+    }
+    
+    // No transfer restrictions (open source, decentralized)
+    // No minting after initial distribution
+    // Pure utility token
 }
 ```
 
 ### Updated: `AnomalyStaking.sol`
 ```solidity
-// Add HONESTLY staking for tier bonuses
-mapping(address => uint256) public honestlyStaked;
-uint256 public constant HONESTLY_DISCOUNT = 10; // 10% per 10K tokens
+// Add VERITAS staking for tier bonuses
+mapping(address => uint256) public veritasStaked;
+uint256 public constant VERITAS_DISCOUNT = 10; // 10% per 10K tokens
 ```
 
 ### New: `Governance.sol`
@@ -192,5 +228,13 @@ uint256 public constant HONESTLY_DISCOUNT = 10; // 10% per 10K tokens
 
 ---
 
-**What's your call?** Keep it simple with LINK-only, or add HONESTLY token for protocol value capture?
+**Decision**: ✅ **LINK-only for Phase 4** (keep it simple), add **VERITAS token later** for governance and value capture.
+
+**Protocol Name**: Honestly  
+**Token Name**: VERITAS (when we launch it)
+
+**Philosophy**: 
+- **Phase 4**: No sale, mission-driven, help people
+- **Future**: Option to sell if needed for growth (governance decides)
+- **Always**: Change the world, not just make money
 
