@@ -9,8 +9,8 @@ This document specifies additional requirements for contributions to and derivat
 All contributions, modifications, forks, and derivative works of this software MUST display the following attribution:
 
 ```
-Contributions belong to original author: aresforblue-ai
-Original Repository: https://github.com/aresforblue-ai/honestly
+Contributions belong to original author: veridicus
+Original Repository: https://github.com/veridicus/honestly
 ```
 
 ### Where Attribution Must Appear
@@ -22,14 +22,14 @@ This attribution statement MUST be included in:
    - Example for JavaScript/TypeScript:
      ```javascript
      /**
-      * Contributions belong to original author: aresforblue-ai
-      * Original Repository: https://github.com/aresforblue-ai/honestly
+      * Contributions belong to original author: veridicus
+      * Original Repository: https://github.com/veridicus/honestly
       */
      ```
    - Example for Python:
      ```python
-     # Contributions belong to original author: aresforblue-ai
-     # Original Repository: https://github.com/aresforblue-ai/honestly
+   # Contributions belong to original author: veridicus
+   # Original Repository: https://github.com/veridicus/honestly
      ```
 
 2. **Documentation Files**
@@ -62,7 +62,7 @@ This attribution statement MUST be included in:
 When contributing to the original repository:
 
 1. By submitting a pull request, you agree that your contributions are subject to the AGPL-3.0-only license
-2. You acknowledge that the original author (aresforblue-ai) retains copyright to the project
+2. You acknowledge that the original author (veridicus) retains copyright to the project
 3. You grant the project maintainers the right to use, modify, and distribute your contributions
 4. Your contributions must not violate any third-party copyrights or licenses
 
@@ -141,9 +141,9 @@ These requirements supplement the GNU AGPL-3.0 license and are enforceable under
 
 ---
 
-**Summary**: Always give credit where it's due. Keep the attribution to aresforblue-ai visible and intact.
+**Summary**: Always give credit where it's due. Keep the attribution to veridicus visible and intact.
 
-**Original Author**: aresforblue-ai  
-**Repository**: https://github.com/aresforblue-ai/honestly  
+**Original Author**: veridicus  
+**Repository**: https://github.com/veridicus/honestly  
 **License**: AGPL-3.0-only with additional terms  
 **Last Updated**: 2025-12-05

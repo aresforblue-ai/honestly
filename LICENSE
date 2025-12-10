@@ -1,8 +1,8 @@
 GNU AFFERO GENERAL PUBLIC LICENSE
 Version 3, 19 November 2007
 
-Copyright (C) 2025 aresforblue-ai
-Original Repository: https://github.com/aresforblue-ai/honestly
+Copyright (C) 2025 veridicus
+Original Repository: https://github.com/veridicus/honestly
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published
@@ -30,8 +30,8 @@ the following additional terms apply to this work:
    the following attribution in all user interfaces, documentation, and
    source code files:
    
-   "Based on 'honestly' by aresforblue-ai
-    Original Repository: https://github.com/aresforblue-ai/honestly"
+   "Based on 'honestly' by veridicus
+    Original Repository: https://github.com/veridicus/honestly"
    
    This attribution must be:
    - Visible in the application's primary About page, settings page, or 

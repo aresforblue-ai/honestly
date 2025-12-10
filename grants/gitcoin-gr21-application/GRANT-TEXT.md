@@ -189,7 +189,7 @@ We're a small team of ZK natives and AI researchers who believe **privacy and ac
 
 | Resource | Link |
 |----------|------|
-| **GitHub** | [github.com/aresforblue-ai/honestly](https://github.com/aresforblue-ai/honestly) |
+| **GitHub** | [github.com/veridicus/honestly](https://github.com/veridicus/honestly) |
 | **Live Dashboard** | [Demo with simulation mode] |
 | **Architecture Docs** | In repo: `/docs/PHASE4-CROSS-CHAIN-FEDERATION.md` |
 | **Economic Model** | In repo: Risk/Reward calculations |

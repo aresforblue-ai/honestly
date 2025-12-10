@@ -106,7 +106,7 @@ Support Honestly on Gitcoin GR21:
 
 Every $ helps build the trust layer for autonomous AI.
 
-GitHub: github.com/aresforblue-ai/honestly
+GitHub: github.com/veridicus/honestly
 
 "Trust should be provable, not promised."
 
@@ -160,7 +160,7 @@ We're building zero-knowledge identity for AI agents — letting them prove repu
 We're fixing that.
 
 🔗 **Support us:** [GITCOIN LINK]
-📂 **GitHub:** github.com/aresforblue-ai/honestly
+📂 **GitHub:** github.com/veridicus/honestly
 
 Every contribution helps build the trust layer for autonomous AI.
 

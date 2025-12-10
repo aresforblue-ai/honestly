@@ -35,7 +35,7 @@ For open-source maintainers working on potentially disruptive technologies:
 - Avoid names that could be confused with real identities
 - Consider trademark searches to avoid conflicts
 
-Example: `aresforblue-ai` (clear, memorable, professional)
+Example: `veridicus` (clear, memorable, professional)
 
 #### 2. Create Isolated Accounts
 
@@ -67,7 +67,7 @@ Best Practice:
 ssh-keygen -t ed25519 -C "pseudonym@protonmail.com"
 
 # Configure git to use pseudonym
-git config --global user.name "aresforblue-ai"
+git config --global user.name "veridicus"
 git config --global user.email "pseudonym@protonmail.com"
 
 # Sign commits with GPG (optional but recommended)
@@ -1002,7 +1002,7 @@ Resources:
 
 **Important Disclaimer**: This document provides general information and should not be construed as legal, financial, or security advice. Consult with qualified professionals for your specific situation. Laws and regulations vary by jurisdiction and change over time. The maintainers of this document are not responsible for any consequences of following this guidance.
 
-**Maintained by**: aresforblue-ai  
-**Repository**: https://github.com/aresforblue-ai/honestly  
+**Maintained by**: veridicus  
+**Repository**: https://github.com/veridicus/honestly  
 **License**: AGPL-3.0-only  
 **Last Updated**: 2025-12-05

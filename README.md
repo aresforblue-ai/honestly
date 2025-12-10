@@ -3,7 +3,7 @@
 <div align="center">
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![Build](https://github.com/aresforblue-ai/honestly/workflows/CI/badge.svg)
+![Build](https://github.com/veridicus/honestly/workflows/CI/badge.svg)
 ![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg)
 ![Coverage](https://img.shields.io/badge/coverage-85%25-yellow.svg)
 
@@ -32,7 +32,7 @@ Honestly is a comprehensive **privacy-preserving identity platform** that enable
 ### 📦 Recent Releases
 
 **v1.0.0** — AI Agent Identity Protocol, Enterprise Security, World-Class UI  
-[View Changelog →](https://github.com/aresforblue-ai/honestly/releases/tag/v1.0.0)
+[View Changelog →](https://github.com/veridicus/honestly/releases/tag/v1.0.0)
 
 ### 🤖 AI Agent Identity Protocol (AAIP)
 - **Verifiable AI Identities** — First-of-its-kind protocol for AI agent authentication
@@ -360,7 +360,7 @@ This software is licensed under the GNU Affero General Public License version 3 
 - ✅ Free to use, modify, and distribute
 - ✅ Source code must be made available
 - ✅ Network use triggers copyleft (AGPL requirement)
-- ⚠️ Must include attribution to aresforblue-ai
+- ⚠️ Must include attribution to veridicus
 - ⚠️ Production deployments should publish on-chain proof
 
 See [LICENSE](LICENSE) and [LICENSE-EXTRAS.md](LICENSE-EXTRAS.md) for full terms and additional requirements.
@@ -371,6 +371,6 @@ See [LICENSE](LICENSE) and [LICENSE-EXTRAS.md](LICENSE-EXTRAS.md) for full terms
 
 **Built with ❤️ for privacy, security, and trust.**
 
-[⭐ Star on GitHub](https://github.com/aresforblue-ai/honestly) • [🐛 Report Bug](https://github.com/aresforblue-ai/honestly/issues) • [💡 Request Feature](https://github.com/aresforblue-ai/honestly/issues)
+[⭐ Star on GitHub](https://github.com/veridicus/honestly) • [🐛 Report Bug](https://github.com/veridicus/honestly/issues) • [💡 Request Feature](https://github.com/veridicus/honestly/issues)
 
 </div>

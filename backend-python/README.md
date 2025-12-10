@@ -411,7 +411,7 @@ Key production considerations:
 
 ## 📧 Support
 
-- **Issues**: [GitHub Issues](https://github.com/aresforblue-ai/honestly/issues)
+- **Issues**: [GitHub Issues](https://github.com/veridicus/honestly/issues)
 - **Security**: See [SECURITY.md](../SECURITY.md)
 - **Documentation**: See `docs/` folder
 

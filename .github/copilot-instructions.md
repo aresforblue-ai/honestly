@@ -1,63 +1,59 @@
-# Copilot Instructions for Honestly
+# Honestly Copilot Agent Instructions
 
-This document provides instructions for GitHub Copilot coding agent to work effectively with the Honestly Truth Engine & Personal Proof Vault repository.
+This guide enables AI coding agents to be productive in the Honestly codebase. It summarizes architecture, workflows, and project-specific conventions. For details, see `README.md`, `ARCHITECTURE.md`, and `backend-python/README.md`.
 
-## 📋 Repository Overview
+## 🏛️ Architecture Overview
 
-Honestly is a comprehensive blockchain-verified identity and credential verification system with three main components:
+- **Frontend**: `frontend-app/` (React, Vite, Tailwind, Apollo)
+- **GraphQL API**: `backend-graphql/` (Node.js, Apollo, Prisma)
+- **Python Backend**: `backend-python/` (FastAPI, Neo4j, ZKPs, Redis, Kafka, Fabric)
+- **Solana/Quantum**: `backend-solana/` (Anchor, Rust, VERIDICUS)
+- **Docs**: `docs/`, `ARCHITECTURE.md`, `SECURITY.md`
 
-1. **Frontend Application** (`frontend-app/`) - React + Vite + TailwindCSS + Apollo Client
-2. **GraphQL Backend** (`backend-graphql/`) - Node.js + Apollo Server + Express
-3. **Python Backend** (`backend-python/`) - FastAPI + Neo4j + Kafka + Hyperledger Fabric
+**Key Flows:**
+- User/agent → Frontend/ConductMe → Python API (vault, ZK proofs, AAIP) → Neo4j/Redis/Blockchain
+- ZK circuits: `backend-python/zkp/` (Groth16, Circom, snarkjs)
+- AI agent registration & proof: `backend-python/identity/`
 
-## 🏗️ Project Structure
+## 🛠️ Dev Workflows
 
-```
-honestly/
-├── frontend-app/           # React frontend (port 3000)
-├── backend-graphql/        # Node.js GraphQL API (port 4000)
-├── backend-python/         # Python FastAPI backend (port 8000)
-├── docs/                   # Documentation
-├── neo4j/                  # Database initialization scripts
-├── docker/                 # Docker configuration
-└── docker-compose.yml      # Infrastructure orchestration
-```
+- **Install**: `make install` (all), or per-component (`npm install`, `pip install -r requirements.txt`)
+- **Run stack**: `make up` (Docker), or manual: start Neo4j, then backend/frontend
+- **Test**: `make test` (all), or `pytest`, `npm test`, `anchor test`
+- **ZK build**: `cd backend-python/zkp && npm run build:*` (see ZKP README)
+- **Lint**: `npm run lint` (frontend/GraphQL)
+- **Rebuild ZK**: `make zkp-rebuild` (wasm/zkey/vkey)
 
-## 🛠️ Development Commands
+## 🔑 Project Patterns & Conventions
 
-### Installation
-```bash
-make install                # Install all dependencies
-cd frontend-app && npm install
-cd backend-graphql && npm install
-cd backend-python && pip install -r requirements.txt
-```
+- **Python**: FastAPI, Pydantic, async/await, type hints, modular routes (`api/`), ZK logic in `zkp/`, agent logic in `identity/`
+- **GraphQL**: Schema-first, resolvers by type, ES6 modules, Winston logging
+- **Frontend**: Functional React, hooks, Tailwind, modular components
+- **ZK Proofs**: Use Groth16, nullifier tracking, C++ witness for large circuits, see `zkp/README.md`
+- **Security**: Never touch `.env`, secrets, or key material. All input validated. Rate limiting, audit logging, and security headers enforced.
+- **Testing**: Unit/integration/E2E in `tests/`, ZK property tests with `ZK_TESTS=1 pytest ...`
 
-### Running Services
-```bash
-make up                     # Start Docker infrastructure
-make dev-frontend           # Start React dev server (port 3000)
-make dev-backend-gql        # Start GraphQL server (port 4000)
-make dev-backend-py         # Start Python API (port 8000)
-```
+## 🧩 Integration Points
 
-### Testing
-```bash
-make test                   # Run all tests
-cd frontend-app && npm test
-cd backend-graphql && npm test
-cd backend-python && pytest
-```
+- **Neo4j**: Graph DB for claims/provenance (see Cypher in `ARCHITECTURE.md`)
+- **Redis**: Caching, nullifier tracking (optional, fallback to memory)
+- **Kafka/FAISS/Fabric**: Optional, disable via env flags
+- **Solana**: Quantum/VERIDICUS program, see `backend-solana/README.md`
 
-### Linting
-```bash
-cd frontend-app && npm run lint
-cd backend-graphql && npm run lint
-```
+## 🚦 Agent-Specific Guidance
 
-### Cleanup
-```bash
-make clean                  # Remove build artifacts and dependencies
+- **Good agent tasks**: Add endpoints, ZK circuits, tests, doc updates, bugfixes, modular refactors
+- **Require human review**: Auth logic, encryption/keys, blockchain integration, schema migrations, infra/CI
+- **Never**: Touch secrets, production DB, or bypass security checks
+
+## 📚 Key References
+
+- `README.md`, `ARCHITECTURE.md`, `backend-python/README.md`, `backend-python/zkp/README.md`
+- API: `backend-python/api/`, ZK: `backend-python/zkp/`, Identity: `backend-python/identity/`
+- Tests: `tests/`, ZK tests: `tests/test_zk_properties.py`
+
+---
+**For unclear patterns or missing info, ask for feedback or check referenced docs.**
 make down                   # Stop Docker services
 ```
 

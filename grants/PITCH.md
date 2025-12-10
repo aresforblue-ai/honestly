@@ -309,7 +309,7 @@ verify_result = verify_zk_proof(
 ### Resources
 
 - **Live Demo**: https://honestly.app (post-deployment)
-- **GitHub**: https://github.com/aresforblue-ai/honestly
+- **GitHub**: https://github.com/veridicus/honestly
 - **Docs**: https://docs.honestly.app
 - **Architecture**: See ARCHITECTURE.md
 - **Security**: See SECURITY.md
@@ -387,7 +387,7 @@ verify_result = verify_zk_proof(
 ## 📧 Contact
 
 **Project**: Honestly - AI Agent Identity Protocol (AAIP)
-**GitHub**: https://github.com/aresforblue-ai/honestly
+**GitHub**: https://github.com/veridicus/honestly
 **Website**: https://honestly.app (coming soon)
 **Twitter**: @honestlyprotocol (setup pending)
 
