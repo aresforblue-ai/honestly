@@ -1,6 +1,6 @@
 "use client";
 
-import { useNetworkStats } from '@/lib/VERIDICUS-data';
+import { useNetworkStats } from '@/lib/veridicus-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, TrendingUp, DollarSign, Activity } from 'lucide-react';
 import { formatNumber } from '@/lib/utils';

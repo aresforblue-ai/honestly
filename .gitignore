@@ -34,6 +34,8 @@ Thumbs.db
 frontend-app/dist/
 backend-graphql/dist/
 *.tsbuildinfo
+.next/
+out/
 
 # Database
 *.db

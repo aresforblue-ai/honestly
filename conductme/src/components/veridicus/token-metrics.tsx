@@ -1,6 +1,6 @@
 "use client";
 
-import { useTokenMetrics } from '@/lib/VERIDICUS-data';
+import { useTokenMetrics } from '@/lib/veridicus-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { formatNumber } from '@/lib/utils';

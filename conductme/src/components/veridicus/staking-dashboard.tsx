@@ -1,6 +1,6 @@
 "use client";
 
-import { useStakingMetrics } from '@/lib/VERIDICUS-data';
+import { useStakingMetrics } from '@/lib/veridicus-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatNumber } from '@/lib/utils';

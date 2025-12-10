@@ -97,3 +97,29 @@ Cloudflare Pages auto-detects npm projects and runs `npm ci` BEFORE your build c
 
 By deleting the lock file in the build command, we force `npm install` to regenerate it fresh every time, which always works.
 
+---
+
+## Problem 3: Cloudflare is Installing Python Dependencies (NEW!)
+
+**Error:** `ERROR: Could not find a version that satisfies the requirement faiss-cpu==1.8.0.post1`
+
+**Issue:** Cloudflare auto-detects `requirements.txt` at the root and tries to install Python dependencies, which fails because `faiss-cpu==1.8.0.post1` is no longer available.
+
+### Fix Option A: Update faiss-cpu version (Quick Fix)
+
+I've updated `requirements.txt` to use `faiss-cpu==1.9.0.post1` (a version that exists). Commit and push:
+
+```powershell
+git add requirements.txt
+git commit -m "Update faiss-cpu version for Cloudflare compatibility"
+git push
+```
+
+### Fix Option B: Skip Python Installation (Better for Pages)
+
+Since you're only deploying the Next.js frontend, you don't need Python dependencies. However, Cloudflare auto-detects and installs them.
+
+**Option:** Rename `requirements.txt` to `requirements.txt.backup` temporarily, or move it to `backend-python/` folder only.
+
+**Or:** Just update the faiss-cpu version (Option A) - it won't hurt anything since you're not using Python in the Pages deployment anyway.
+
