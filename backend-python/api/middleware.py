@@ -154,7 +154,7 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             return Response(
                 content=json.dumps(
                     {
-                        "detail": str(e) if is_dev else "Internal server error",
+                        "detail": "Internal server error",
                         "error_id": hashlib.sha256(
                             f"{time.time()}{request.url.path}".encode()
                         ).hexdigest()[:16],
