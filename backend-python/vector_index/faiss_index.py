@@ -76,6 +76,8 @@ class FaissIndex:
 
     def search(self, vector: List[float], top_k: int = 5) -> List[Dict]:
         vec = np.array([vector], dtype="float32")
+        # FAISS documentation convention: D = distances, I = indices.
+        # Here, we use descriptive names for clarity: distances, indices = self.index.search(...)
         distances, indices = self.index.search(vec, top_k)
         results = []
         for dist, faiss_id in zip(distances[0], indices[0]):
