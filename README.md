@@ -6,12 +6,34 @@
 ![Build](https://github.com/veridicus/honestly/workflows/CI/badge.svg)
 ![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg)
 ![Coverage](https://img.shields.io/badge/coverage-85%25-yellow.svg)
+![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+![Node](https://img.shields.io/badge/node-20.x-green.svg)
+![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)
 
 **A production-ready, blockchain-verified identity and credential verification system with zero-knowledge proofs, AI integration, and enterprise-grade security.**
 
-[🚀 Quick Start](#-quick-start) • [📚 Documentation](#-documentation) • [🔐 Security](#-security) • [🤖 AI Integration](#-ai-integration)
+[🚀 Quick Start](#-quick-start) • [📚 Documentation](#-documentation) • [🔐 Security](#-security) • [🤖 AI Integration](#-ai-integration) • [🤝 Contributing](CONTRIBUTING.md)
 
 </div>
+
+---
+
+## 📋 Table of Contents
+
+- [What is Honestly?](#-what-is-honestly)
+- [What's New](#-whats-new)
+- [Architecture](#️-architecture)
+- [AI Agent Identity Protocol (AAIP)](#-ai-agent-identity-protocol-aaip)
+- [Quick Start](#-quick-start)
+- [Zero-Knowledge Proofs](#-zero-knowledge-proofs)
+- [Testing](#-testing)
+- [AI Integration](#-ai-integration)
+- [Monitoring](#-monitoring)
+- [Documentation](#-documentation)
+- [Security](#️-security)
+- [What Makes This World-Class](#-what-makes-this-world-class)
+- [Contributing](#-contributing)
+- [License](#-license)
 
 ---
 
@@ -348,6 +370,60 @@ See [SECURITY.md](SECURITY.md) for details.
 6. **Beautiful UI** — Modern glassmorphism design, animations
 7. **Extensible** — Modular architecture for custom circuits/features
 8. **Well-Documented** — Extensive docs and inline comments
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions from the community! Whether you're fixing bugs, adding features, or improving documentation, your help is appreciated.
+
+### How to Contribute
+
+1. **Read the Guidelines** — Check out [CONTRIBUTING.md](CONTRIBUTING.md) for detailed instructions
+2. **Find an Issue** — Look for issues labeled `good first issue` or `help wanted`
+3. **Fork & Code** — Fork the repo, create a branch, and make your changes
+4. **Test** — Run tests and ensure everything passes
+5. **Submit PR** — Open a pull request with a clear description
+
+### Areas We Need Help
+
+- 🐛 **Bug Fixes** — Help us squash bugs
+- ✨ **New Features** — Implement requested features
+- 📚 **Documentation** — Improve guides and examples
+- 🧪 **Testing** — Add test coverage
+- 🔐 **Security** — Security audits and improvements
+- 🌍 **Translations** — Help make Honestly accessible globally
+
+### Development Setup
+
+```bash
+# Fork and clone the repository
+git clone https://github.com/YOUR-USERNAME/honestly.git
+cd honestly
+
+# Install dependencies
+make install
+
+# Start development environment
+make up
+
+# Run tests
+make test
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for complete guidelines including:
+- Code style standards
+- Commit message format
+- Testing requirements
+- Pull request process
+- Code of conduct
+
+### Recognition
+
+Contributors are recognized in:
+- [CONTRIBUTORS.md](CONTRIBUTORS.md) (coming soon)
+- Release notes
+- Project documentation
 
 ---
 
