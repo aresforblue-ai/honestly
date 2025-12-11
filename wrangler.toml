@@ -8,10 +8,10 @@ compatibility_date = "2024-01-01"
 name = "veridicus"
 compatibility_date = "2024-01-01"
 
-# Build configuration
-# Cloudflare Pages will use these settings automatically
-# Build command: npm install npm run build
-# Output directory: .next
+# Build configuration for Cloudflare Pages
+# The build command should be: npm install && npm run build
+# This will run the build script in root package.json which delegates to conductme/
+# Output directory: conductme/.next
 
 # Pages configuration
-pages_build_output_dir = ".next"
+pages_build_output_dir = "conductme/.next"
