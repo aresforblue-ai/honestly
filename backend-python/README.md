@@ -1,7 +1,30 @@
 # Honestly - Python Backend
-# Last updated: 2025-12-06
+
+**Last updated**: December 11, 2024
 
 Production-ready Python backend for the Honestly Truth Engine, providing secure vault operations, zero-knowledge proofs, AI integration, and enterprise-grade monitoring.
+
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115.5-green.svg)](https://fastapi.tiangolo.com/)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](../LICENSE)
+
+---
+
+## 📋 Table of Contents
+
+- [Features](#-features)
+- [Quick Start](#-quick-start)
+- [API Endpoints](#-api-endpoints)
+- [Zero-Knowledge Proofs](#-zero-knowledge-proofs)
+- [AI Agent Identity Protocol](#-ai-agent-identity-protocol)
+- [Testing](#-testing)
+- [Security](#-security)
+- [Configuration](#-configuration)
+- [Project Structure](#-project-structure)
+- [Development](#-development)
+- [Production Deployment](#-production-deployment)
+
+---
 
 ## 🚀 Features
 

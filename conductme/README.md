@@ -2,9 +2,28 @@
 
 **World's first privacy-preserving AI orchestration platform with cryptographic proof of humanity.**
 
+[![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](../LICENSE)
+
 ConductMe enables you to orchestrate multiple AI agents (Claude, GPT-4, local LLMs) with cryptographic guarantees that every action is authorized by a verified human. This prevents AI agents from operating autonomously without human oversight.
 
-## 🎯 What Makes This Top 5 App Material
+---
+
+## 📋 Table of Contents
+
+- [What Makes This World-Class](#-what-makes-this-world-class)
+- [Architecture](#️-architecture)
+- [Quick Start](#-quick-start)
+- [Features](#-features)
+- [Trust Bridge](#-trust-bridge)
+- [Deployment](#-deployment)
+- [Security](#-security)
+- [Development](#-development)
+
+---
+
+## 🎯 What Makes This World-Class
 
 ### 1. **Privacy-Preserving Identity**
 - Client-side Semaphore identity generation (secrets never leave browser)
