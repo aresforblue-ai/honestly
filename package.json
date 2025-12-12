@@ -2,13 +2,12 @@
   "name": "honestly",
   "version": "1.0.0",
   "description": "Privacy-preserving identity verification with zero-knowledge proofs and blockchain anchoring",
-  "main": "src/index.js",
+  "private": true,
   "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "lint": "eslint src tests",
-    "lint:fix": "eslint src tests --fix"
+    "dev": "cd conductme && npm run dev",
+    "build": "cd conductme && npm run build",
+    "test": "cd backend-python && pytest",
+    "lint": "cd conductme && npm run lint"
   },
   "keywords": [
     "identity",
@@ -20,23 +19,6 @@
     "solana",
     "web3"
   ],
-  "author": "",
-  "license": "AGPL-3.0-only",
-  "devDependencies": {
-    "eslint": "^9.39.1",
-    "jest": "^30.2.0"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "coverageDirectory": "coverage",
-    "collectCoverageFrom": [
-      "src/**/*.js"
-    ],
-    "testMatch": [
-      "**/tests/**/*.test.js"
-    ]
-  },
-  "dependencies": {
-    "wrangler": "^4.53.0"
-  }
+  "author": "Veridicus",
+  "license": "AGPL-3.0-only"
 }
