@@ -11,15 +11,18 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@semaphore-protocol/core": "^4.0.0",
-    "@semaphore-protocol/group": "^4.0.0",
-    "@semaphore-protocol/identity": "^4.0.0",
-    "@semaphore-protocol/proof": "^4.0.0",
-    "ethers": "^6.11.0"
+    "@semaphore-protocol/core": "^4.14.0",
+    "@semaphore-protocol/group": "^4.14.0",
+    "@semaphore-protocol/identity": "^4.14.0",
+    "@semaphore-protocol/proof": "^4.14.0",
+    "ethers": "^6.16.0"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
-    "typescript": "^5.3.3",
+    "@types/node": "^20.17.10",
+    "typescript": "^5.7.3",
     "vitest": "^4.0.15"
+  },
+  "overrides": {
+    "snarkjs": "^0.7.5"
   }
 }

@@ -22,8 +22,8 @@ const BINDING_STORAGE_KEY = 'conductme:binding:v2';
 
 export interface ClientIdentity {
   commitment: string;
-  trapdoor: string;
-  nullifier: string;
+  privateKey: string; // Base64 encoded private key
+  secretScalar: string; // Secret scalar for advanced use
   createdAt: number;
   // The binding links this identity to an Honestly proof WITHOUT revealing the mapping
   bindingCommitment?: string;
@@ -93,8 +93,8 @@ export function generateClientIdentity(): ClientIdentity {
   
   const clientIdentity: ClientIdentity = {
     commitment: identity.commitment.toString(),
-    trapdoor: identity.trapdoor.toString(),
-    nullifier: identity.nullifier.toString(),
+    privateKey: identity.export(), // Export as base64
+    secretScalar: identity.secretScalar.toString(),
     createdAt: Date.now(),
   };
   

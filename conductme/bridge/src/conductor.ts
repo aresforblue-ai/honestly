@@ -52,7 +52,7 @@ export class Conductor {
       ...config,
     };
     
-    this.group = new ConductMeGroup(config.groupId, this.config.treeDepth);
+    this.group = new ConductMeGroup(config.groupId); // New API doesn't need tree depth
     this.nullifierRegistry = new NullifierRegistry();
   }
   
