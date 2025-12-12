@@ -15,18 +15,19 @@ import { ethers } from 'ethers';
 
 export interface ConductMeIdentity {
   commitment: string;
-  trapdoor: string;
-  nullifier: string;
+  privateKey: string; // Base64 encoded private key (replaces trapdoor + nullifier)
+  secretScalar: string; // Secret scalar derived from private key
   createdAt: number;
   verified: boolean;
 }
 
 export interface SignalProof {
-  proof: unknown;
+  proof: unknown; // PackedGroth16Proof or full proof
   nullifierHash: string;
   signal: string;
   externalNullifier: string;
   merkleTreeRoot: string;
+  merkleTreeDepth?: number;
 }
 
 /**
@@ -40,24 +41,24 @@ export function createIdentity(entropy?: string): ConductMeIdentity {
   
   return {
     commitment: identity.commitment.toString(),
-    trapdoor: identity.trapdoor.toString(),
-    nullifier: identity.nullifier.toString(),
+    privateKey: identity.export(), // Export as base64
+    secretScalar: identity.secretScalar.toString(),
     createdAt: Date.now(),
     verified: false,
   };
 }
 
 /**
- * Recover an identity from stored secrets
+ * Recover an identity from stored private key
  */
-export function recoverIdentity(trapdoor: string, nullifier: string): ConductMeIdentity {
-  // Reconstruct identity from secrets
-  const identity = new Identity(`${trapdoor}_${nullifier}`);
+export function recoverIdentity(privateKey: string): ConductMeIdentity {
+  // Reconstruct identity from exported private key
+  const identity = Identity.import(privateKey);
   
   return {
     commitment: identity.commitment.toString(),
-    trapdoor,
-    nullifier,
+    privateKey,
+    secretScalar: identity.secretScalar.toString(),
     createdAt: Date.now(),
     verified: true,
   };
@@ -112,9 +113,9 @@ export class ConductMeGroup {
   private group: Group;
   private groupId: string;
   
-  constructor(groupId: string, treeDepth: number = 20) {
+  constructor(groupId: string) {
     this.groupId = groupId;
-    this.group = new Group(treeDepth);
+    this.group = new Group(); // New Group API doesn't require tree depth
   }
   
   /**
@@ -152,7 +153,7 @@ export class ConductMeGroup {
    * Get group size
    */
   size(): number {
-    return this.group.members.length;
+    return this.group.size;
   }
   
   /**
@@ -163,23 +164,22 @@ export class ConductMeGroup {
     signal: string,
     externalNullifier: string
   ): Promise<SignalProof> {
-    const semaphoreIdentity = new Identity(
-      `${identity.trapdoor}_${identity.nullifier}`
-    );
+    const semaphoreIdentity = Identity.import(identity.privateKey);
     
     const proof = await generateProof(
       semaphoreIdentity,
       this.group,
-      externalNullifier,
-      signal
+      signal,
+      externalNullifier
     );
     
     return {
-      proof: proof.proof,
-      nullifierHash: proof.nullifierHash.toString(),
-      signal,
-      externalNullifier,
+      proof: proof.points, // New API uses 'points' for packed proof
+      nullifierHash: proof.nullifier.toString(),
+      signal: proof.message.toString(),
+      externalNullifier: proof.scope.toString(),
       merkleTreeRoot: proof.merkleTreeRoot.toString(),
+      merkleTreeDepth: proof.merkleTreeDepth,
     };
   }
   
@@ -188,34 +188,33 @@ export class ConductMeGroup {
    */
   async verifyMembershipProof(signalProof: SignalProof): Promise<boolean> {
     return verifyProof({
-      proof: signalProof.proof as any,
-      merkleTreeRoot: BigInt(signalProof.merkleTreeRoot),
-      nullifierHash: BigInt(signalProof.nullifierHash),
-      externalNullifier: signalProof.externalNullifier,
-      signal: signalProof.signal,
-    });
+      merkleTreeDepth: signalProof.merkleTreeDepth || 20,
+      merkleTreeRoot: signalProof.merkleTreeRoot,
+      nullifier: signalProof.nullifierHash,
+      message: signalProof.signal,
+      scope: signalProof.externalNullifier,
+      points: signalProof.proof,
+    } as any);
   }
   
   /**
    * Export group state for persistence
    */
-  export(): { groupId: string; members: string[]; root: string } {
-    return {
+  export(): string {
+    return JSON.stringify({
       groupId: this.groupId,
-      members: this.group.members.map(m => m.toString()),
-      root: this.getRoot(),
-    };
+      groupData: this.group.export(),
+    });
   }
   
   /**
    * Import group state
    */
-  static import(data: { groupId: string; members: string[]; root: string }): ConductMeGroup {
-    const group = new ConductMeGroup(data.groupId);
-    for (const member of data.members) {
-      group.addMember(member);
-    }
-    return group;
+  static import(data: string): ConductMeGroup {
+    const parsed = JSON.parse(data);
+    const conductMeGroup = new ConductMeGroup(parsed.groupId);
+    conductMeGroup.group = Group.import(parsed.groupData);
+    return conductMeGroup;
   }
 }
 

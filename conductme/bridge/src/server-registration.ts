@@ -143,8 +143,8 @@ export class PrivacyPreservingRegistrar {
   private honestlyNullifiers: HonestlyNullifierRegistry;
   private bindingCommitments: Map<string, string> = new Map(); // commitment -> binding
   
-  constructor(groupId: string, treeDepth: number = 20) {
-    this.group = new ConductMeGroup(groupId, treeDepth);
+  constructor(groupId: string) {
+    this.group = new ConductMeGroup(groupId); // New API doesn't need tree depth
     this.honestlyNullifiers = new HonestlyNullifierRegistry();
   }
   
@@ -247,26 +247,24 @@ export class PrivacyPreservingRegistrar {
   /**
    * Export state for persistence
    */
-  export(): {
-    group: ReturnType<ConductMeGroup['export']>;
-    honestlyNullifiers: ReturnType<HonestlyNullifierRegistry['export']>;
-    bindingCommitments: Array<[string, string]>;
-  } {
-    return {
-      group: this.group.export(),
+  export(): string {
+    return JSON.stringify({
+      groupData: this.group.export(),
       honestlyNullifiers: this.honestlyNullifiers.export(),
       bindingCommitments: Array.from(this.bindingCommitments.entries()),
-    };
+    });
   }
   
   /**
    * Import state from persistence
    */
-  static import(data: ReturnType<PrivacyPreservingRegistrar['export']>): PrivacyPreservingRegistrar {
-    const registrar = new PrivacyPreservingRegistrar(data.group.groupId);
-    registrar.group = ConductMeGroup.import(data.group);
-    registrar.honestlyNullifiers = HonestlyNullifierRegistry.import(data.honestlyNullifiers);
-    registrar.bindingCommitments = new Map(data.bindingCommitments);
+  static import(data: string): PrivacyPreservingRegistrar {
+    const parsed = JSON.parse(data);
+    const groupData = JSON.parse(parsed.groupData);
+    const registrar = new PrivacyPreservingRegistrar(groupData.groupId);
+    registrar.group = ConductMeGroup.import(parsed.groupData);
+    registrar.honestlyNullifiers = HonestlyNullifierRegistry.import(parsed.honestlyNullifiers);
+    registrar.bindingCommitments = new Map(parsed.bindingCommitments);
     return registrar;
   }
 }
