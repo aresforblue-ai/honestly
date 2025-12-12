@@ -9,7 +9,7 @@ name = "veridicus"
 compatibility_date = "2024-01-01"
 
 # Build configuration for Cloudflare Pages
-# The build command should be: npm install && npm run build
+# The build command should be: npm run build (Cloudflare Pages automatically runs npm install before this step)
 # This will run the build script in root package.json which delegates to conductme/
 # Output directory: conductme/.next
 
