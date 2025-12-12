@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getDefaultRegistrar } from '@bridge/server-registration';
 
 /**
  * POST /api/identity/register
@@ -66,13 +67,17 @@ export async function POST(request: Request) {
       );
     }
     
-    // In production, this would use the PrivacyPreservingRegistrar
-    // For now, simulate the registration
-    const result = await simulatePrivacyPreservingRegistration({
+    // Use the real PrivacyPreservingRegistrar
+    const registrar = getDefaultRegistrar();
+    
+    // Note: In a serverless environment, the registrar state needs to be persisted.
+    // The singleton getDefaultRegistrar() only holds state in memory for the process lifetime.
+    
+    const result = await registrar.register({
       semaphoreCommitment,
       bindingCommitment,
       honestlyNullifier,
-      honestlyProof,
+      honestlyProof: honestlyProof as any, // Cast to match interface if needed
     });
     
     if (!result.success) {
@@ -103,48 +108,6 @@ export async function POST(request: Request) {
 }
 
 /**
- * Simulate privacy-preserving registration
- * In production, this would use the actual PrivacyPreservingRegistrar
- */
-async function simulatePrivacyPreservingRegistration(request: {
-  semaphoreCommitment: string;
-  bindingCommitment: string;
-  honestlyNullifier: string;
-  honestlyProof: { proof: unknown; publicSignals: unknown; proofType: string };
-}): Promise<{
-  success: boolean;
-  error?: string;
-  groupId?: string;
-  merkleRoot?: string;
-  memberIndex?: number;
-}> {
-  // Simulated nullifier registry (in production, use persistent storage)
-  const usedNullifiers = new Set<string>();
-  
-  // Check for double-registration
-  if (usedNullifiers.has(request.honestlyNullifier)) {
-    return {
-      success: false,
-      error: 'This Honestly proof has already been used to register an identity',
-    };
-  }
-  
-  // In production, verify the Honestly proof here
-  // const verified = await verifyHonestlyProof(request.honestlyProof);
-  // if (!verified) return { success: false, error: 'Invalid proof' };
-  
-  // Simulate successful registration
-  const mockMerkleRoot = `0x${Buffer.from(request.semaphoreCommitment).toString('hex').slice(0, 64)}`;
-  
-  return {
-    success: true,
-    groupId: 'conductme-main',
-    merkleRoot: mockMerkleRoot,
-    memberIndex: Math.floor(Math.random() * 1000),
-  };
-}
-
-/**
  * GET /api/identity/register
  * Check registration status
  */
@@ -159,13 +122,15 @@ export async function GET(request: Request) {
     );
   }
   
-  // In production, check if commitment is in the group
+  const registrar = getDefaultRegistrar();
+  const isRegistered = registrar.isRegistered(commitment);
+  const groupInfo = registrar.getGroupInfo();
+  
   return NextResponse.json({
     data: {
       commitment,
-      registered: true, // Simulated
-      groupId: 'conductme-main',
+      registered: isRegistered,
+      groupId: groupInfo.groupId,
     },
   });
 }
-

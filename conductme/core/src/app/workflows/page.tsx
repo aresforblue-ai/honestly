@@ -3,10 +3,22 @@ import ReactFlow, { MiniMap, Controls, Background } from "reactflow";
 import "reactflow/dist/style.css";
 import { useWorkflowStore } from "@/store/workflowStore";
 import { Button } from "@/components/ui/button";
+import { Play, RotateCcw, Save, Upload } from "lucide-react";
 
 export default function WorkflowsPage() {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, saveWorkflow, loadWorkflow, resetWorkflow, lastSavedAt } =
-    useWorkflowStore();
+  const { 
+    nodes, 
+    edges, 
+    onNodesChange, 
+    onEdgesChange, 
+    onConnect, 
+    saveWorkflow, 
+    loadWorkflow, 
+    resetWorkflow, 
+    executeWorkflow,
+    executionStatus,
+    lastSavedAt 
+  } = useWorkflowStore();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -18,13 +30,26 @@ export default function WorkflowsPage() {
             {lastSavedAt && <p className="text-xs text-muted-foreground">Last saved: {lastSavedAt}</p>}
           </div>
           <div className="flex gap-2">
+            <Button 
+              className="bg-green-600 hover:bg-green-700 text-white"
+              size="sm" 
+              onClick={executeWorkflow}
+              disabled={executionStatus === 'running'}
+            >
+              <Play className="mr-2 h-4 w-4" />
+              {executionStatus === 'running' ? 'Running...' : 'Run Workflow'}
+            </Button>
+            <div className="w-px h-8 bg-border mx-2" />
             <Button variant="outline" size="sm" onClick={loadWorkflow}>
+              <Upload className="mr-2 h-4 w-4" />
               Load
             </Button>
             <Button variant="outline" size="sm" onClick={saveWorkflow}>
+              <Save className="mr-2 h-4 w-4" />
               Save
             </Button>
-            <Button variant="secondary" size="sm" onClick={resetWorkflow}>
+            <Button variant="ghost" size="sm" onClick={resetWorkflow}>
+              <RotateCcw className="mr-2 h-4 w-4" />
               Reset
             </Button>
           </div>
@@ -49,4 +74,3 @@ export default function WorkflowsPage() {
     </div>
   );
 }
-

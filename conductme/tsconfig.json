@@ -16,9 +16,14 @@
     "plugins": [ { "name": "next" } ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@bridge/*": ["./bridge/src/*"]
     }
   },
+<<<<<<< Current (Your changes)
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": [ "node_modules", "core", "bridge", "my-first-worker" ]
+=======
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "bridge/src/**/*.ts"],
+>>>>>>> Incoming (Background Agent changes)
+  "exclude": [ "node_modules", "core", "my-first-worker" ]
 }
