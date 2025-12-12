@@ -129,5 +129,5 @@ After deployment:
 
 ---
 
-**Last Updated**: December 2024
+**Last Updated**: December 2025
 **Repository**: [veridicusio/honestly](https://github.com/veridicusio/honestly)
